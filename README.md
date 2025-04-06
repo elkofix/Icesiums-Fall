@@ -1,1 +1,14 @@
-[![Review Assignment Due Date](https://classroom.github.com/assets/deadline-readme-button-22041afd0340ce965d47ae6ef1cefeee28c7c493a6346c4f15d667ab976d596c.svg)](https://classroom.github.com/a/hCr2pIQp)
+## Cómo correr la primera parte del proyecto
+
+1. Instala SWI-Prolog.
+2. Abre una terminal y navega a la carpeta del proyecto.
+3. Ejecuta:
+
+```bash
+?- [prolog/facts].
+?- [prolog/rules].
+?- [prolog/search].
+?- take_key(a).
+?- unlock_door(a, b).
+?- dfs(a, e, Path).
+```
