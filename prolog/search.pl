@@ -1,30 +1,30 @@
-% DFS y BFS sobre el estado actual del mundo (sólo puertas desbloqueadas)
+:- module(search, [
+    dfs/3,
+    bfs/3
+]).
 
-% --- Movimiento permitido según puertas desbloqueadas ---
-connected(X, Y) :- door(X, Y, unlocked).
-connected(X, Y) :- door(Y, X, unlocked).
+:- use_module(rules).
 
-% --- DFS (Depth-First Search) ---
+% DFS
 dfs(Start, Goal, Path) :-
-    dfs_helper(Start, Goal, [Start], RevPath),
-    reverse(RevPath, Path).
+    dfs_helper(Start, Goal, [Start], Path).
 
 dfs_helper(Goal, Goal, Path, Path).
 dfs_helper(Current, Goal, Visited, Path) :-
-    connected(Current, Next),
+    rules:can_move(Current, Next),
     \+ member(Next, Visited),
-    dfs_helper(Next, Goal, [Next|Visited], Path).
+    dfs_helper(Next, Goal, [Next | Visited], Path).
 
-% --- BFS (Breadth-First Search) ---
+% BFS
 bfs(Start, Goal, Path) :-
     bfs_helper([[Start]], Goal, RevPath),
     reverse(RevPath, Path).
 
-bfs_helper([[Goal|Rest]|_], Goal, [Goal|Rest]).
-bfs_helper([CurrentPath|OtherPaths], Goal, FinalPath) :-
-    CurrentPath = [CurrentNode|_],
-    findall([Next,CurrentNode|Rest],
-        (connected(CurrentNode, Next), \+ member(Next, CurrentPath)),
+bfs_helper([[Goal | Rest] | _], Goal, [Goal | Rest]).
+bfs_helper([CurrentPath | Paths], Goal, FinalPath) :-
+    CurrentPath = [CurrentRoom | _],
+    findall([Next, CurrentRoom | Rest],
+        (rules:can_move(CurrentRoom, Next), \+ member(Next, CurrentPath)),
         NewPaths),
-    append(OtherPaths, NewPaths, UpdatedPaths),
-    bfs_helper(UpdatedPaths, Goal, FinalPath).
+    append(Paths, NewPaths, Queue),
+    bfs_helper(Queue, Goal, FinalPath).
