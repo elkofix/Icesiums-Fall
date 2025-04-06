@@ -5,6 +5,7 @@
 3. Ejecuta:
 
 ```bash
+swipl
 ?- [prolog/facts].
 ?- [prolog/rules].
 ?- [prolog/search].
