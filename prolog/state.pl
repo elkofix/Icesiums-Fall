@@ -1,86 +1,156 @@
 :- module(state, [
     player_location/1, inventory/1, door_state/3,
-    has_piece/1, object_moved/1, puzzle_solved/0,
-    move_player/1, pick_key/1, move_object/1,
-    solve_puzzle/0, unlock_door/2
+    has_piece/2, object_moved/1, puzzle_solved/1,
+    move_player/1, pick_key/1, pick_piece/1, move_object/1,
+    solve_puzzle/1, unlock_door/2, has_key/1
 ]).
 
-:- dynamic player_location/1, inventory/1, door_state/3,
-           has_piece/1, object_moved/1, puzzle_solved/0.
+:- dynamic player_location/1.
+:- dynamic inventory/1.
+:- dynamic door_state/3.
+:- dynamic has_piece/2.
+:- dynamic object_moved/1.
+:- dynamic puzzle_solved/1.
 
 :- use_module(facts).
 
-% Estado inicial
+% Initial state
 player_location(a).
 inventory([]).
 
-door_state(a, b, locked).
-door_state(b, a, locked).
-door_state(b, c, locked).
-door_state(c, b, locked).
+% Initialize door states
+:- forall(facts:door(X, Y, State), assertz(door_state(X, Y, State))).
 
-% Mover jugador
+% Move player between rooms
 move_player(NewRoom) :-
     player_location(Current),
     (door_state(Current, NewRoom, unlocked) ; door_state(NewRoom, Current, unlocked)),
     retract(player_location(Current)),
     assertz(player_location(NewRoom)),
-    format("Te moviste de ~w a ~w.~n", [Current, NewRoom]).
+    format("You moved from ~w to ~w.~n", [Current, NewRoom]),
+    !.
+move_player(NewRoom) :-
+    format("You cannot move to room ~w. The door is locked.~n", [NewRoom]).
 
-% Recoger llave
+% Check if player has a key
+has_key(Key) :-
+    inventory(Inv),
+    member(Key, Inv).
+
+% Pick up a key
 pick_key(Key) :-
     player_location(Room),
-    key_in_room(Room, Key),
+    facts:key_in_room(Room, Key),
     inventory(Inv),
     \+ member(Key, Inv),
     retract(inventory(Inv)),
     assertz(inventory([Key | Inv])),
-    format("Has recogido la llave: ~w~n", [Key]).
+    format("You have picked up key: ~w~n", [Key]),
+    !.
+pick_key(Key) :-
+    format("Cannot pick up key ~w here.~n", [Key]).
 
-% Mover objeto
+% Pick up a puzzle piece
+pick_piece(Piece) :-
+    player_location(Room),
+    facts:piece_in_room(Room, Piece, Puzzle),
+    \+ has_piece(Puzzle, Piece),
+    assertz(has_piece(Puzzle, Piece)),
+    format("You have picked up piece ~w of puzzle ~w!~n", [Piece, Puzzle]),
+    !.
+pick_piece(Piece) :-
+    format("Cannot pick up piece ~w here.~n", [Piece]).
+
+% Move an object to find hidden pieces
 move_object(Object) :-
     player_location(Room),
-    object_in_room(Room, Object),
+    facts:object_in_room(Room, Object),
     \+ object_moved(Object),
     assertz(object_moved(Object)),
-    ( hides_piece(Object, Piece) ->
-        assertz(has_piece(Piece)),
-        format("¡Encontraste una pieza: ~w!~n", [Piece])
+    % Check if moving reveals a puzzle piece
+    ( facts:hides_piece(Object, Puzzle, Piece) ->
+        assertz(has_piece(Puzzle, Piece)),
+        format("You moved ~w and found piece ~w of puzzle ~w!~n", [Object, Piece, Puzzle])
     ;
-        writeln("No había nada debajo.")
-    ).
+        format("You moved ~w but found nothing interesting.~n", [Object])
+    ),
+    !.
+move_object(Object) :-
+    player_location(Room),
+    facts:object_in_room(Room, Object),
+    object_moved(Object),
+    format("You've already examined ~w.~n", [Object]),
+    !.
+move_object(Object) :-
+    format("There is no ~w here to move.~n", [Object]).
 
-% Resolver puzzle
-solve_puzzle :-
-    findall(P, piece(P), AllPieces),
-    findall(P, has_piece(P), FoundPieces),
-    % Piezas visibles
-    player_location(Current),
-    findall(P, piece_visible_in_room(Current, P), VisiblePieces),
-    forall(member(P, VisiblePieces), ( \+ has_piece(P) -> assertz(has_piece(P)) ; true )),
-    append(FoundPieces, VisiblePieces, AllCurrent),
-    sort(AllCurrent, AllCollected),
-    sort(AllPieces, AllExpected),
-    AllCollected == AllExpected,
-    \+ puzzle_solved,
-    assertz(puzzle_solved),
-    writeln("¡Puzzle resuelto!").
+% Solve a puzzle
+solve_puzzle(Puzzle) :-
+    player_location(Room),
+    facts:puzzle_room(Puzzle, Room),
+    \+ puzzle_solved(Puzzle),
+    % Get all pieces needed for this puzzle
+    findall(Piece, facts:piece(Puzzle, Piece), AllPieces),
+    % Check if player has all necessary pieces
+    forall(member(P, AllPieces), has_piece(Puzzle, P)),
+    assertz(puzzle_solved(Puzzle)),
+    format("Congratulations! You have solved puzzle ~w!~n", [Puzzle]),
+    !.
+solve_puzzle(Puzzle) :-
+    player_location(Room),
+    facts:puzzle_room(Puzzle, Room),
+    \+ puzzle_solved(Puzzle),
+    format("You don't have all the pieces needed to solve puzzle ~w.~n", [Puzzle]),
+    !.
+solve_puzzle(Puzzle) :-
+    player_location(Room),
+    facts:puzzle(Puzzle),
+    \+ facts:puzzle_room(Puzzle, Room),
+    format("Puzzle ~w cannot be solved in this room.~n", [Puzzle]),
+    !.
+solve_puzzle(Puzzle) :-
+    puzzle_solved(Puzzle),
+    format("Puzzle ~w is already solved.~n", [Puzzle]),
+    !.
+solve_puzzle(Puzzle) :-
+    format("Unknown puzzle: ~w~n", [Puzzle]).
 
-% Desbloquear puertas
+% Dynamic door unlocking system
 unlock_door(From, To) :-
     door_state(From, To, locked),
-    ( From = a, inventory(Inv), member(key1, Inv) ->
-        retract(door_state(From, To, locked)),
-        assertz(door_state(From, To, unlocked)),
-        retract(door_state(To, From, locked)),
-        assertz(door_state(To, From, unlocked)),
-        writeln("Puerta desbloqueada con llave.")
-    ; From = b, puzzle_requirement(b, [puzzle_solved]), puzzle_solved ->
-        retract(door_state(From, To, locked)),
-        assertz(door_state(From, To, unlocked)),
-        retract(door_state(To, From, locked)),
-        assertz(door_state(To, From, unlocked)),
-        writeln("Puerta desbloqueada tras resolver el puzzle.")
-    ;
-        writeln("No cumples con los requisitos para desbloquear esa puerta.")
-    ).
+    % Check if there are requirements for this door
+    facts:door_requirements(From, To, Requirements),
+    % Check if all requirements are met
+    check_all_requirements(Requirements),
+    % Update door state
+    retract(door_state(From, To, locked)),
+    assertz(door_state(From, To, unlocked)),
+    retract(door_state(To, From, locked)),
+    assertz(door_state(To, From, unlocked)),
+    format("Door between rooms ~w and ~w has been unlocked!~n", [From, To]),
+    !.
+unlock_door(From, To) :-
+    door_state(From, To, unlocked),
+    format("The door between rooms ~w and ~w is already unlocked.~n", [From, To]),
+    !.
+unlock_door(From, To) :-
+    facts:door_requirements(From, To, Requirements),
+    format("You cannot unlock this door yet. Requirements: ~w~n", [Requirements]),
+    !.
+unlock_door(From, To) :-
+    format("There is no direct door between rooms ~w and ~w.~n", [From, To]).
+
+% Check if all requirements for a door are met
+check_all_requirements([]).
+check_all_requirements([Req|Rest]) :-
+    check_requirement(Req),
+    check_all_requirements(Rest).
+
+% Check individual requirements
+check_requirement(has_key(Key)) :-
+    has_key(Key), !.
+check_requirement(puzzle_solved(Puzzle)) :-
+    puzzle_solved(Puzzle), !.
+check_requirement(Req) :-
+    format("Requirement not met: ~w~n", [Req]),
+    fail.
