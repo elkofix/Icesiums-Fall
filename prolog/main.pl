@@ -1,7 +1,9 @@
-
+% main.pl
 :- use_module(state).
 :- use_module(facts).
 :- use_module(rules).
+:- use_module(constraints).
+:- use_module(library(clpfd)).
 
 % Help command
 help :-
@@ -9,19 +11,35 @@ help :-
     writeln("- look. : Look around the room"),
     writeln("- move_player(Room). : Move to another room"),
     writeln("- pick_key(Key). : Pick up a key"),
+    writeln("- drop_key(Key). : Drop a key in the current room"),
     writeln("- pick_piece(Piece). : Pick up a puzzle piece"),
+    writeln("- drop_piece(Piece). : Drop a puzzle piece in the current room"),
     writeln("- move_object(Object). : Examine an object"),
     writeln("- inventory. : View your inventory"),
     writeln("- puzzle_status(Puzzle). : Check status of a puzzle"),
-    writeln("- solve_puzzle(Puzzle). : Try to solve a puzzle"),
-    writeln("- unlock_door(From, To). : Unlock a door"),
+    writeln("- solve_puzzle(Puzzle). : Try to solve a puzzle (consumes pieces)"),
+    writeln("- unlock_door(From, To). : Unlock a door (consumes keys)"),
     writeln("- init_game. : Reset the game"),
+    writeln("- game_stats. : View game statistics and constraints"),
     writeln("- help. : Show this help").
 
 % Look around the current room
 look :-
     state:player_location(Room),
     format("You are in room ~w.~n~n", [Room]),
+    
+    % Display turn count for this room
+    constraints:turns_in_room(Room, Turns),
+    format("Turns spent in this room: ~w~n", [Turns]),
+    
+    % Check for trap in this room
+    (constraints:trap(Room, turns(Limit)) ->
+        RemainingTurns #= Limit - Turns,
+        format("WARNING: This room has a trap that activates after ~w turns! (~w turns remaining)~n", 
+              [Limit, RemainingTurns])
+    ;
+        true
+    ),
     
     % Interactive objects
     findall(Obj, facts:object_in_room(Room, Obj), Objects),
@@ -38,13 +56,15 @@ look :-
         ))
     ),
     
-    % Visible puzzle pieces
-    findall(Piece-Puzzle, facts:piece_in_room(Room, Piece, Puzzle), Pieces),
-    (Pieces = [] ->
+    % Visible puzzle pieces (both original and dropped)
+    findall(Piece-Puzzle, facts:piece_in_room(Room, Piece, Puzzle), OriginalPieces),
+    findall(Piece-Puzzle, state:piece_dropped(Piece, Puzzle, Room), DroppedPieces),
+    append(OriginalPieces, DroppedPieces, AllPieces),
+    (AllPieces = [] ->
         true
     ;
         writeln("\nAvailable puzzle pieces:"),
-        forall(member(Piece-Puzzle, Pieces), 
+        forall(member(Piece-Puzzle, AllPieces), 
                (state:has_piece(Puzzle, Piece) -> 
                     format("- ~w (of puzzle ~w) [Already collected]~n", [Piece, Puzzle])
                ;
@@ -52,14 +72,16 @@ look :-
         )
     ),
     
-    % Keys
-    findall(K, facts:key_in_room(Room, K), Keys),
+    % Keys (both original and dropped)
+    findall(K, facts:key_in_room(Room, K), OriginalKeys),
+    findall(K, state:key_dropped(K, Room), DroppedKeys),
+    append(OriginalKeys, DroppedKeys, AllKeys),
     state:inventory(Inv),
-    (Keys = [] ->
+    (AllKeys = [] ->
         true
     ;
         writeln("\nAvailable keys:"),
-        forall(member(K, Keys), 
+        forall(member(K, AllKeys), 
                (member(K, Inv) ->
                     format("- ~w [Already collected]~n", [K])
                ;
@@ -81,7 +103,13 @@ look :-
                 format("- Room ~w (LOCKED) - Requirements: ~w~n", [D, Reqs])
             )
         ))
-    ).
+    ),
+    
+    % Show move count
+    constraints:move_count(Moves),
+    constraints:max_moves(MaxMoves),
+    RemainingMoves #= MaxMoves - Moves,
+    format("\nMoves used: ~w/~w (~w remaining)~n", [Moves, MaxMoves, RemainingMoves]).
 
 % Show inventory
 inventory :-
@@ -92,6 +120,11 @@ inventory :-
     ;
         forall(member(Item, Items), format("- ~w~n", [Item]))
     ),
+    
+    % Show inventory limits
+    constraints:can_carry(key, KeyLimit),
+    constraints:count_items_of_type(key, KeyCount),
+    format("Keys: ~w/~w~n", [KeyCount, KeyLimit]),
     
     % Show collected puzzle pieces
     writeln("\nCollected puzzle pieces:"),
@@ -105,6 +138,11 @@ inventory :-
             format("~w~n", [Pieces])
         ))
     ),
+    
+    % Show piece inventory limit
+    constraints:can_carry(piece, PieceLimit),
+    constraints:count_items_of_type(piece, PieceCount),
+    format("Puzzle pieces: ~w/~w~n", [PieceCount, PieceLimit]),
     
     % Show solved puzzles
     writeln("\nSolved puzzles:"),
@@ -129,6 +167,10 @@ puzzle_status(Puzzle) :-
         facts:puzzle_room(Puzzle, Room),
         format("- Must be solved in room: ~w~n", [Room])
     ).
+
+% Game stats
+game_stats :-
+    rules:game_stats.
 
 % Alias for init_game
 init_game :-

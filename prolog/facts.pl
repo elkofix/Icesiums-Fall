@@ -1,3 +1,4 @@
+% facts.pl
 :- module(facts, [
     room/1, door/3, key_in_room/2,
     object_in_room/2, hides_piece/3, piece/2,
