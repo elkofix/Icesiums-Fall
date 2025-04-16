@@ -15,6 +15,7 @@
 :- dynamic puzzle_solved/1.
 :- dynamic key_dropped/2.    % key_dropped(Key, Room)
 :- dynamic piece_dropped/3.  % piece_dropped(Piece, Puzzle, Room)
+:- dynamic has_key/1.
 
 :- use_module(facts).
 :- use_module(constraints).

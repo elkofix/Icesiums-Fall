@@ -1,8 +1,9 @@
-% rules.pl
+
 :- module(rules, [
     can_move/2,
     initialize_game/0,
-    game_stats/0
+    game_stats/0,
+    satisfy_requirements/1,
 ]).
 
 :- use_module(state).
@@ -13,6 +14,28 @@
 % Check if player can move between rooms
 can_move(From, To) :-
     state:door_state(From, To, unlocked).
+
+%==========
+can_move(From, To) :-
+    state:door_state(From, To, locked),
+    facts:door_requirements(From, To, Reqs),
+    satisfy_requirements(Reqs).
+    
+satisfy_requirements(Reqs) :-
+    maplist(satisfy_requirement, Reqs).
+
+% Predicado auxiliar para verificar requisitos
+satisfy_requirements([]).
+satisfy_requirements([Req|Rest]) :-
+    satisfy_requirement(Req),
+    satisfy_requirements(Rest).
+
+satisfy_requirement(has_key(Key)) :-
+    state:has_key(Key).
+satisfy_requirement(puzzle_solved(Puzzle)) :-
+    state:puzzle_solved(Puzzle).
+
+%=========
 
 % Initialize game state
 initialize_game :-
@@ -76,3 +99,10 @@ game_stats :-
     format("- Inventory limits:~n"),
     format("  * Keys: ~w/~w~n", [KeyCount, KeyLimit]),
     format("  * Puzzle pieces: ~w/~w~n", [PieceCount, PieceLimit]).
+
+
+    puzzle_requirements_met(Puzzle) :-
+    findall(Piece, facts:piece(Puzzle, Piece), Pieces),
+    findall(P, (member(P, Pieces), state:has_piece(Puzzle, P)), Collected),
+    length(Pieces, Total),
+    length(Collected, Total).

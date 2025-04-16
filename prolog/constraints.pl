@@ -1,6 +1,8 @@
 % constraints.pl
 :- module(constraints, [
     max_moves/1,
+    max_b_visits/1,
+    valid_state/4,
     can_carry/2,
     trap/2, 
     turns_in_room/2,
@@ -19,6 +21,7 @@
 :- use_module(state).
 
 :- dynamic max_moves/1.
+:- dynamic max_b_visits/1.
 :- dynamic can_carry/2.
 :- dynamic trap/2.
 :- dynamic move_count/1.
@@ -26,6 +29,7 @@
 
 % Default constraints
 max_moves(30).  % Default maximum number of moves
+max_b_visits(3).  % Maximum visits to room B
 
 % Inventory limits for different item types
 can_carry(key, 2).    % Can carry up to 2 keys
@@ -109,3 +113,29 @@ initialize_constraints :-
     assertz(turns_in_room(b, 0)),
     assertz(turns_in_room(c, 0)),
     assertz(turns_in_room(d, 0)).
+
+
+% Check if the current state is valid
+% This predicate checks if the current state of the game is valid based on the constraints defined above.
+valid_state(Room, Keys, Moves, BVisits) :-
+    % Verificar límite de movimientos
+    max_moves(MaxMoves),
+    Moves =< MaxMoves,
+    
+    % Verificar límite de visitas a B si estamos en esa habitación
+    (Room == 'B' -> 
+        max_b_visits(MaxB),
+        BVisits =< MaxB
+    ; true),
+    
+    % Verificar que las llaves sean válidas
+    valid_keys(Keys),
+    
+    % Verificar que la habitación existe
+    room(Room).
+
+% Predicado auxiliar para validar llaves
+valid_keys([]).
+valid_keys([Key|Rest]) :-
+    (key_in_room(_, Key) ; has_key(Key)), 
+    valid_keys(Rest).
