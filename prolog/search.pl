@@ -3,7 +3,7 @@
     bfs/3
 ]).
 
-:- use_module(rules).
+:- use_module(rules, [predicado1/2, predicado2/3] ).
 
 % DFS
 dfs(Start, Goal, Path) :-

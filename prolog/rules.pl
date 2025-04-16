@@ -3,7 +3,7 @@
     can_move/2,
     initialize_game/0,
     game_stats/0,
-    satisfy_requirements/1,
+    satisfy_requirements/1
 ]).
 
 :- use_module(state).

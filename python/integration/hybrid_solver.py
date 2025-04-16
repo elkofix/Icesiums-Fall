@@ -83,16 +83,16 @@ class HybridSolver(AStarSolver):
         valid_moves = []
         room = self.graph.get_room(current_state.room)
         
-        for neighbor, cost, is_locked, key_needed in room.connections:
+        for neighbor, cost, is_locked, key_needed, puzzle_needed in room.connections:
             if neighbor in prolog_moves:
                 if is_locked:
                     if key_needed in current_keys:
-                        valid_moves.append((neighbor, cost, is_locked, key_needed))
+                        valid_moves.append((neighbor, cost, is_locked, key_needed, puzzle_needed))
                         
                     elif self.verbose:
                         print(f"Puerta {current_state.room}-{neighbor} bloqueada (falta {key_needed})")
                 else:
-                    valid_moves.append((neighbor, cost, is_locked, key_needed))
+                    valid_moves.append((neighbor, cost, is_locked, key_needed, puzzle_needed))
         
         return valid_moves
     
