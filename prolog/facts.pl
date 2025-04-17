@@ -9,9 +9,6 @@
 
 key(key1).
 key(key2).
-key(key_B).
-key(key_C).
-key(key_D).
 
 
 % Rooms
