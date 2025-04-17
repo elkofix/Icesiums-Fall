@@ -5,6 +5,9 @@ class Room:
         self.connections = []  
         self.has_key = None
         self.is_trap = False
+        self.puzzle_piece = None # Pieza de puzzle en la habitación (si existe)
+        self.hidden_pieces = []       # ← Lista de piezas ocultas
+        self.hides_piece_with = {} 
 
 class EscapeRoomGraph:
     """

@@ -54,6 +54,26 @@ class HybridSolver:
                 if verbose:
                     print(f"¡Recogida llave {room.has_key} en habitación {current_state.room}!")
 
+           # Recolectar piezas (visibles u ocultas)
+            new_pieces = set(current_state.pieces)
+
+            # --- Piezas visibles según Prolog
+            for piece, puzzle in self.prolog.get_visible_pieces(current_state.room):
+                if piece not in new_pieces:
+                    if self.prolog.pick_piece(piece):
+                        new_pieces.add(piece)
+                        if verbose:
+                            print(f"🧩 Recogida pieza visible {piece} del puzzle {puzzle} en habitación {current_state.room}!")
+
+            # --- Piezas ocultas según Prolog
+            for obj, piece, puzzle in self.prolog.get_hidden_pieces(current_state.room):
+                if piece not in new_pieces:
+                    if self.prolog.try_move_object(obj):
+                        new_pieces.add(piece)
+                        if verbose:
+                            print(f"🧱 Movido objeto {obj} y se encontró pieza oculta: {piece} del puzzle {puzzle}")
+
+
             # Obtener movimientos validados por Prolog
             prolog_moves = self.prolog.get_possible_moves(
                 current_state.room,
@@ -68,13 +88,30 @@ class HybridSolver:
                 if is_locked and key_needed not in new_keys:
                     if self.verbose:
                         print(f"Movimiento bloqueado: {current_state.room} -> {neighbor} (falta llave {key_needed})")
+                        
                     continue
 
-                if puzzle_needed:  # Si se requiere resolver un puzzle, puedes manejarlo aquí
-                    if self.verbose:
+                if puzzle_needed:
+                    if verbose:
                         print(f"Movimiento requiere resolver puzzle: {current_state.room} -> {neighbor} (puzzle {puzzle_needed})")
-                    # Aquí podrías agregar lógica para manejar puzzles si es necesario
-                    continue
+
+                    # Verificar si se tiene la pieza necesaria
+                    if puzzle_needed not in new_pieces:
+                        print(f"❌ No tienes la pieza necesaria para resolver el puzzle {puzzle_needed}")
+                        continue
+
+                    resolved = self.prolog.try_resolve_puzzle(
+                        puzzle=puzzle_needed,
+                        room=current_state.room
+                    )
+
+                    if resolved:
+                        print(f"✔️ Puzzle {puzzle_needed} resuelto. Intentando de nuevo el movimiento...")
+                        heapq.heappush(open_set, (cost, current_state))
+                        continue
+                    else:
+                        print(f"❌ Aún no se puede resolver el puzzle {puzzle_needed}, omitiendo movimiento.")
+                        continue
 
                 # Crear nuevo estado
                 new_b_visits = current_state.b_visits
@@ -86,7 +123,8 @@ class HybridSolver:
                     new_keys,
                     current_state.moves + cost,
                     current_state.path + [neighbor],
-                    new_b_visits
+                    new_b_visits,
+                    new_pieces
                 )
 
                 # Calcular f_score y agregar a la cola
@@ -121,7 +159,7 @@ class HybridSolver:
             return False
 
         # Verificar si ya visitamos este estado
-        state_key = (state.room, frozenset(state.keys), state.b_visits)
+        state_key = (state.room, frozenset(state.keys), frozenset(state.pieces), state.b_visits)
         if state_key in self.visited:
             return False
         self.visited.add(state_key)
@@ -177,12 +215,13 @@ class State:
     """
     Representa un estado en el espacio de búsqueda.
     """
-    def __init__(self, room, keys, moves, path, b_visits):
+    def __init__(self, room, keys, moves, path, b_visits, pieces=None):
         self.room = room
         self.keys = set(keys)
         self.moves = moves
         self.path = path
         self.b_visits = b_visits
+        self.pieces = pieces if pieces else set()
 
     def __lt__(self, other):
         """Comparación para la cola de prioridad"""
