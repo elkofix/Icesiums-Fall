@@ -87,3 +87,61 @@ class PrologBridge:
         """Verifica si el camino es solución válida en Prolog"""
         query = f"check_solution({path})"
         return bool(list(self.prolog.query(query)))
+
+    def try_resolve_puzzle(self, puzzle, room):
+        # 1. Recoger piezas visibles
+        visible_pieces = self.query(f"piece_in_room({room}, Piece, {puzzle}).")
+        for entry in visible_pieces:
+            piece = entry["Piece"]
+            if not self.query(f"picked_piece({piece})."):
+                print(f"Recogiendo pieza visible {piece} en {room}")
+                self.query(f"pick_piece({piece}).")
+
+        # 2. Buscar objetos que esconden piezas
+        hidden = self.query(f"hides_piece(Object, {puzzle}, Piece).")
+        for entry in hidden:
+            obj = entry["Object"]
+            piece = entry["Piece"]
+
+            # Mover el objeto si no se ha movido aún
+            if not self.query(f"moved_object({obj})."):
+                print(f"Moviendo objeto {obj} para revelar {piece}")
+                self.query(f"move_object({obj}).")
+
+            # Recoger la pieza si no se ha recogido
+            if not self.query(f"picked_piece({piece})."):
+                print(f"Recogiendo pieza oculta {piece} de {obj}")
+                self.query(f"pick_piece({piece}).")
+
+        # 3. Verificar si el puzzle está resuelto
+        resolved = self.query(f"can_resolve_puzzle({puzzle}).")
+        if resolved:
+            print(f"Puzzle {puzzle} ahora está resuelto.")
+            self.query(f"mark_puzzle_resolved({puzzle}).")
+            return True
+        return False
+
+
+    def pick_piece(self, piece):
+        query = f"pick_piece({piece})"
+        return bool(list(self.prolog.query(query)))
+
+    def try_move_object(self, object_):
+        query = f"move_object({object_})"
+        return bool(list(self.prolog.query(query)))
+
+
+    def assert_piece_collected(self, piece):
+        self.prolog.assertz(f"pieza_recolectada({piece})")
+
+    def try_solve_puzzle(self, puzzle):
+        query = f"solve_puzzle({puzzle})"
+        return bool(list(self.prolog.query(query)))
+
+    def get_visible_pieces(self, room):
+        query = f"facts:piece_in_room({room}, Piece, Puzzle)"
+        return [(str(result["Piece"]), str(result["Puzzle"])) for result in self.prolog.query(query)]
+
+    def get_hidden_pieces(self, room):
+        query = f"facts:object_in_room({room}, Object), facts:hides_piece(Object, Puzzle, Piece)"
+        return [(str(result["Object"]), str(result["Piece"]), str(result["Puzzle"])) for result in self.prolog.query(query)]
