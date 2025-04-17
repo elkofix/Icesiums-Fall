@@ -4,6 +4,7 @@
     initialize_game/0,
     game_stats/0,
     satisfy_requirements/1,
+    get_possible_moves/2
 ]).
 
 :- use_module(state).
@@ -16,22 +17,28 @@ can_move(From, To) :-
     state:door_state(From, To, unlocked).
 
 %==========
+% Devuelve una lista de todas las habitaciones a las que se puede mover desde una habitación específica
+get_possible_moves(From, Moves) :-
+    setof(To, (facts:door(From, To, _), can_move(From, To)), Moves), !.
+get_possible_moves(_, []).  % Si no hay movimientos posibles, devuelve una lista vacía.
+
+% Verifica si el jugador puede moverse entre habitaciones
 can_move(From, To) :-
-    state:door_state(From, To, locked),
+    state:door_state(From, To, unlocked).  % La puerta está desbloqueada.
+
+can_move(From, To) :-
+    state:door_state(From, To, locked),    % La puerta está cerrada.
     facts:door_requirements(From, To, Reqs),
-    satisfy_requirements(Reqs).
-    
+    satisfy_requirements(Reqs).           % Verifica si se cumplen los requisitos.
+
+% Verifica si se cumplen los requisitos para moverse
 satisfy_requirements(Reqs) :-
     maplist(satisfy_requirement, Reqs).
 
-% Predicado auxiliar para verificar requisitos
-satisfy_requirements([]).
-satisfy_requirements([Req|Rest]) :-
-    satisfy_requirement(Req),
-    satisfy_requirements(Rest).
-
+% Predicado auxiliar para verificar requisitos individuales
 satisfy_requirement(has_key(Key)) :-
     state:has_key(Key).
+
 satisfy_requirement(puzzle_solved(Puzzle)) :-
     state:puzzle_solved(Puzzle).
 
@@ -106,3 +113,10 @@ game_stats :-
     findall(P, (member(P, Pieces), state:has_piece(Puzzle, P)), Collected),
     length(Pieces, Total),
     length(Collected, Total).
+
+player_caught :-
+    player_location(Room),
+    guard_position(Room),
+    writeln('¡You have been captured by the guard!!'),
+    writeln('Game over. Type "init_game." to restart.'),
+    fail.

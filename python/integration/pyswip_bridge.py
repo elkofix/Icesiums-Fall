@@ -55,10 +55,10 @@ class PrologBridge:
             self._update_prolog_state(keys)
             
             # Consultar movimientos posibles
-            query = f"facts:door({room}, Next, State), (State = unlocked ; (State = locked, facts:door_requirements({room}, Next, Reqs), satisfy_requirements(Reqs)))."
+            query = f"facts:door({room.lower()}, Next, State), (State = unlocked ; (State = locked, facts:door_requirements({room}, Next, Reqs), satisfy_requirements(Reqs)))."
 
             results = list(self.prolog.query(query))
-            return [res['Next'] for res in results]
+            return [res['Next'].upper() for res in results]
             
         except Exception as e:
             print(f"Error en get_possible_moves: {e}")
@@ -87,3 +87,14 @@ class PrologBridge:
         """Verifica si el camino es solución válida en Prolog"""
         query = f"check_solution({path})"
         return bool(list(self.prolog.query(query)))
+    
+    def update_guard_position(self, room):
+        """Actualiza la posición del guardia en Prolog"""
+        self.prolog.assertz(f"guard_position({room})")
+        
+    def get_guard_position(self):
+        """Obtiene la posición actual del guardia"""
+        try:
+            return list(self.prolog.query("guard_position(X)"))[0]['X']
+        except:
+            return None
