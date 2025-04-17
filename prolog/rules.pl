@@ -113,3 +113,30 @@ game_stats :-
     findall(P, (member(P, Pieces), state:has_piece(Puzzle, P)), Collected),
     length(Pieces, Total),
     length(Collected, Total).
+
+player_caught :-
+    player_location(Room),
+    guard_position(Room),
+    writeln('¡You have been captured by the guard   !!'),
+    writeln('Game over. Type "init_game." to restart.'),
+    fail.
+
+
+move_guard :-
+    guard_position(CurrentPos),
+    player_location(PlayerPos),
+    % Obtener mejor movimiento del adversario
+    py_call(adversarial:get_guard_move(CurrentPos, PlayerPos), NewPos),
+    retract(guard_position(CurrentPos)),
+    assertz(guard_position(NewPos)),
+    (CurrentPos \= NewPos -> 
+        format("The guard moves from ~w to ~w!~n", [CurrentPos, NewPos])
+    ;
+        format("The guard stays in room ~w, watching carefully...~n", [CurrentPos])
+    ),
+    % Verificar si atrapó al jugador
+    (NewPos == PlayerPos ->
+        writeln("The guard has caught you!"),
+        writeln("Game over. Type 'init_game.' to restart."),
+        fail
+    ; true).

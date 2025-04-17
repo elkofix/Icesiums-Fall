@@ -76,3 +76,7 @@ hides_piece(painting, puzzle2, p6).
 % Which room each puzzle must be solved in
 puzzle_room(puzzle1, b).
 puzzle_room(puzzle2, c).
+
+% Guard position
+:- dynamic guard_position/1.
+guard_position(b).  % El guardia comienza en la habitación B

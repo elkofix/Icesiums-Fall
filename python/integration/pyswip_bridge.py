@@ -145,3 +145,14 @@ class PrologBridge:
     def get_hidden_pieces(self, room):
         query = f"facts:object_in_room({room}, Object), facts:hides_piece(Object, Puzzle, Piece)"
         return [(str(result["Object"]), str(result["Piece"]), str(result["Puzzle"])) for result in self.prolog.query(query)]
+    
+    def update_guard_position(self, room):
+        """Actualiza la posición del guardia en Prolog"""
+        self.prolog.assertz(f"guard_position({room})")
+        
+    def get_guard_position(self):
+        """Obtiene la posición actual del guardia"""
+        try:
+            return list(self.prolog.query("guard_position(X)"))[0]['X']
+        except:
+            return None
