@@ -32,16 +32,26 @@ inventory([]).
 
 % Move player between rooms with constraint checks
 move_player(NewRoom) :-
-    constraints:check_move_limit,  % Check if move limit reached
+    constraints:check_move_limit,
     player_location(Current),
     (door_state(Current, NewRoom, unlocked) ; door_state(NewRoom, Current, unlocked)),
     % Update counters FIRST before changing location
-    constraints:increment_move_count,  % Increment move counter
-    constraints:increment_room_turn(NewRoom),  % Increment room turn counter
+    constraints:increment_move_count,
+    constraints:increment_room_turn(NewRoom),
     % Now update location
     retract(player_location(Current)),
     assertz(player_location(NewRoom)),
-    format("You moved from ~w to ~w.~n", [Current, NewRoom]),
+    % Mover al guardia después del jugador
+    move_guard,
+    % Check for guard collision AFTER moving
+    (guard_position(NewRoom) ->
+        format("You moved from ~w to ~w.~n", [Current, NewRoom]),
+        writeln("Oh no! You've been caught by the guard!"),
+        writeln("Game over. Type 'init_game.' to restart."),
+        fail
+    ;
+        format("You moved from ~w to ~w.~n", [Current, NewRoom])
+    ),
     !.
 move_player(NewRoom) :-
     format("You cannot move to room ~w. The door is locked.~n", [NewRoom]).
