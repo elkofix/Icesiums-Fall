@@ -57,24 +57,28 @@ class HybridSolver:
             new_pieces = list(current_state.pieces)
             found_new_piece = False
 
-            # 1. Recoger piezas visibles
+            # 1. Recoger solo piezas visibles que están en esta habitación
             for piece, puzzle in self.prolog.get_visible_pieces(current_state.room):
-                if not any(p == piece and puz == puzzle for (puz, p) in new_pieces):
-                    if self.prolog.pick_piece(piece):
-                        new_pieces.append((puzzle, piece))
-                        found_new_piece = True
-                        if verbose:
-                            print(f"🧩 Recogida pieza visible {piece} del puzzle {puzzle} en habitación {current_state.room}!")
-
-            # 2. Interactuar con objetos para encontrar piezas ocultas
-            for obj, piece, puzzle in self.prolog.get_hidden_pieces(current_state.room):
-                if not any(p == piece and puz == puzzle for (puz, p) in new_pieces):
-                    if self.prolog.try_move_object(obj):
+                # Verificar si la pieza realmente pertenece a esta habitación
+                if self._is_piece_in_room(puzzle, piece, current_state.room):
+                    if not any(p == piece and puz == puzzle for (puz, p) in new_pieces):
                         if self.prolog.pick_piece(piece):
                             new_pieces.append((puzzle, piece))
                             found_new_piece = True
                             if verbose:
-                                print(f"🧱 Movido objeto {obj} y se encontró pieza oculta: {piece} del puzzle {puzzle}")
+                                print(f"🧩 Recogida pieza visible {piece} del puzzle {puzzle} en habitación {current_state.room}!")
+
+            # 2. Interactuar con objetos para encontrar piezas ocultas SOLO en esta habitación
+            for obj, piece, puzzle in self.prolog.get_hidden_pieces(current_state.room):
+                # Verificar si la pieza realmente pertenece a esta habitación
+                if self._is_piece_in_room(puzzle, piece, current_state.room):
+                    if not any(p == piece and puz == puzzle for (puz, p) in new_pieces):
+                        if self.prolog.try_move_object(obj):
+                            if self.prolog.pick_piece(piece):
+                                new_pieces.append((puzzle, piece))
+                                found_new_piece = True
+                                if verbose:
+                                    print(f"🧱 Movido objeto {obj} y se encontró pieza oculta: {piece} del puzzle {puzzle}")
 
             # Si encontramos nuevas piezas, actualizamos el estado
             if found_new_piece:
@@ -82,7 +86,7 @@ class HybridSolver:
                 if verbose:
                     print(f"Piezas recolectadas actualizadas: {new_pieces}")
 
-            # Intentar resolver puzzles si tenemos todas las piezas necesarias
+            # Intentar resolver puzzles si estamos en la habitación correcta y tenemos todas las piezas
             self._try_solve_puzzles(current_state)
 
             # Obtener movimientos validados por Prolog
@@ -106,7 +110,7 @@ class HybridSolver:
 
                 if puzzle_needed:
                     if verbose:
-                        print(f"Movimiento requiere resolver puzzle: {current_state.room} -> {neighbor} (puzzle {puzzle_needed})")
+                        print(f"Movimiento requiere puzzle resuelto: {current_state.room} -> {neighbor} (puzzle {puzzle_needed})")
 
                     # Verificar si el puzzle está resuelto usando el método de PrologBridge
                     if not self.prolog.try_solve_puzzle(puzzle_needed):
@@ -137,16 +141,33 @@ class HybridSolver:
 
         return None, None  # No se encontró solución
 
+    def _is_piece_in_room(self, puzzle, piece, room):
+        """Verifica si una pieza pertenece realmente a la habitación actual"""
+        # Consultar a Prolog dónde está ubicada esta pieza
+        query = f"facts:piece_location({puzzle}, {piece}, X)"
+        results = list(self.prolog.prolog.query(query))
+        if results:
+            return results[0]['X'].upper() == room.upper()
+        return False
+
     def _try_solve_puzzles(self, current_state):
-        """Intenta resolver puzzles si tenemos todas las piezas necesarias"""
+        """Intenta resolver puzzles si estamos en la habitación correcta y tenemos todas las piezas"""
         # Obtener todos los puzzles del juego
         puzzles = set(puzzle for (puzzle, _) in current_state.pieces)
         
         for puzzle in puzzles:
+            # Verificar si estamos en la habitación correcta para resolver este puzzle
+            query = f"facts:puzzle_room({puzzle}, Room)"
+            results = list(self.prolog.prolog.query(query))
+            if results and results[0]['Room'].upper() != current_state.room.upper():
+                if self.verbose:
+                    print(f"Puzzle {puzzle} no se puede resolver en esta habitación")
+                continue
+                
             # Verificar si ya está resuelto
             if self.prolog.try_solve_puzzle(puzzle):
                 if self.verbose:
-                    print(f"¡Puzzle {puzzle} resuelto con éxito!")
+                    print(f"¡Puzzle {puzzle} resuelto con éxito en habitación {current_state.room}!")
                 # Actualizar lista de piezas (se eliminan al resolver)
                 current_state.pieces = [(puz, piece) for (puz, piece) in current_state.pieces if puz != puzzle]
 
