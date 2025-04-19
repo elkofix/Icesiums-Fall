@@ -3,6 +3,7 @@
 :- use_module(facts).
 :- use_module(rules).
 :- use_module(constraints).
+% :- use_module(search).
 :- use_module(library(clpfd)).
 
 % Help command
@@ -21,6 +22,7 @@ help :-
     writeln("- unlock_door(From, To). : Unlock a door (consumes keys)"),
     writeln("- init_game. : Reset the game"),
     writeln("- game_stats. : View game statistics and constraints"),
+    writeln("- find_escape_plan. : Find the solution to escape to room D"),
     writeln("- help. : Show this help").
 
 % Look around the current room
