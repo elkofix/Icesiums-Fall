@@ -41,17 +41,8 @@ move_player(NewRoom) :-
     % Now update location
     retract(player_location(Current)),
     assertz(player_location(NewRoom)),
-    % Mover al guardia después del jugador
-    move_guard,
-    % Check for guard collision AFTER moving
-    (guard_position(NewRoom) ->
-        format("You moved from ~w to ~w.~n", [Current, NewRoom]),
-        writeln("Oh no! You've been caught by the guard!"),
-        writeln("Game over. Type 'init_game.' to restart."),
-        fail
-    ;
-        format("You moved from ~w to ~w.~n", [Current, NewRoom])
-    ),
+    % Show move confirmation
+    format("You moved from ~w to ~w.~n", [Current, NewRoom]),
     !.
 move_player(NewRoom) :-
     format("You cannot move to room ~w. The door is locked.~n", [NewRoom]).
