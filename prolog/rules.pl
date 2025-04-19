@@ -113,3 +113,4 @@ game_stats :-
     findall(P, (member(P, Pieces), state:has_piece(Puzzle, P)), Collected),
     length(Pieces, Total),
     length(Collected, Total).
+

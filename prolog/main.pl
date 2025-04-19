@@ -3,8 +3,26 @@
 :- use_module(facts).
 :- use_module(rules).
 :- use_module(constraints).
-% :- use_module(search).
 :- use_module(library(clpfd)).
+
+% Start game function - ask user for game type
+start_game :-
+    writeln("Welcome to the Dynamic Prolog Escape Room!"),
+    writeln("Choose an option:"),
+    writeln("1. Load predefined game"),
+    writeln("2. Create custom game"),
+    writeln("Enter your choice (1 or 2):"),
+    read(Choice),
+    (Choice = 1 ->
+        facts:load_predefined_game,
+        rules:initialize_game
+    ; Choice = 2 ->
+        facts:create_custom_game,
+        rules:initialize_game
+    ;
+        writeln("Invalid choice. Please enter 1 or 2."),
+        start_game
+    ).
 
 % Help command
 help :-
@@ -23,7 +41,9 @@ help :-
     writeln("- init_game. : Reset the game"),
     writeln("- game_stats. : View game statistics and constraints"),
     writeln("- find_escape_plan. : Find the solution to escape to room D"),
-    writeln("- help. : Show this help").
+    writeln("- help. : Show this help"),
+    writeln("- create_custom_game. : Create a new custom escape room"),
+    writeln("- load_predefined_game. : Load the predefined escape room").
 
 % Look around the current room
 look :-
@@ -174,13 +194,19 @@ puzzle_status(Puzzle) :-
 game_stats :-
     rules:game_stats.
 
+% Create custom game command
+create_custom_game :-
+    facts:create_custom_game,
+    rules:initialize_game.
+
+% Load predefined game command
+load_predefined_game :-
+    facts:load_predefined_game,
+    rules:initialize_game.
+
 % Alias for init_game
 init_game :-
     rules:initialize_game.
 
 % Entry point
-:- initialization((
-    writeln("Welcome to the Prolog Escape Room!"),
-    writeln("Type 'help.' to see available commands."),
-    init_game
-)).
+:- initialization(start_game).
