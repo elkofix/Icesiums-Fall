@@ -1,12 +1,22 @@
 from integration.prolog_Bridge import PrologBridge
+from A_star.a_star import a_star_escape
 
-def display_menu():
-    print("\n=== Escape Room Solver ===")
+def display_main_menu():
+    print("\n===== Menú Inicial =====")
+    print("1. BFS (Prolog)")
+    print("2. A* (Python)")
+    print("3. Salir")
+    return input("Seleccione una opción: ")
+
+# ================== PROLOG MENU ==================
+
+def display_prolog_menu():
+    print("\n=== Escape Room Solver (Prolog - BFS) ===")
     print("1. Cargar juego predefinido")
     print("2. Crear juego personalizado")
     print("3. Buscar solución de escape")
     print("4. Mostrar estado actual")
-    print("5. Salir")
+    print("5. Volver al menú inicial")
     return input("Seleccione una opción: ")
 
 def display_solution(steps):
@@ -18,13 +28,13 @@ def display_solution(steps):
     else:
         print("\nNo se encontró una solución válida para escapar")
 
-def main():
+def prolog_mode():
     solver = PrologBridge()
     current_state = None
-    
+
     while True:
-        choice = display_menu()
-        
+        choice = display_prolog_menu()
+
         if choice == '1':
             if solver.initialize_game(1):
                 current_state = solver.get_current_state()
@@ -32,7 +42,7 @@ def main():
                 print(f"Ubicación actual: {current_state['room']}")
             else:
                 print("Error al cargar el juego predefinido")
-        
+
         elif choice == '2':
             if solver.initialize_game(2):
                 current_state = solver.get_current_state()
@@ -40,16 +50,16 @@ def main():
                 print(f"Ubicación actual: {current_state['room']}")
             else:
                 print("Error al crear el juego personalizado")
-        
+
         elif choice == '3':
             if not current_state:
                 print("Primero debe cargar o crear un juego!")
                 continue
-                
-            print("\nBuscando solución óptima...")
+
+            print("\nBuscando solución óptima (BFS - Prolog)...")
             solution = solver.find_escape_plan()
             display_solution(solution)
-        
+
         elif choice == '4':
             if current_state:
                 print("\n=== Estado Actual ===")
@@ -58,13 +68,62 @@ def main():
                 print(f"Puzzles resueltos: {current_state['solved_puzzles']}")
             else:
                 print("Primero debe cargar o crear un juego!")
-        
+
         elif choice == '5':
+            print("Volviendo al menú inicial...")
+            break
+
+        else:
+            print("Opción no válida. Intente nuevamente.")
+
+# ================== A* MENU ==================
+
+def a_star_menu():
+    print("\n=== Escape Room Solver (Python - A*) ===")
+    print("1. Ejecutar A* desde A hasta D")
+    print("2. Ejecutar A* desde cualquier nodo")
+    print("3. Volver al menú inicial")
+    return input("Seleccione una opción: ")
+
+def a_star_mode():
+    while True:
+        choice = a_star_menu()
+
+        if choice == '1':
+            path = a_star_escape("A", "D")
+            display_solution(path)
+
+        elif choice == '2':
+            start = input("Ingrese el nodo de inicio: ").strip().upper()
+            goal = input("Ingrese el nodo destino: ").strip().upper()
+            path = a_star_escape(start, goal)
+            display_solution(path)
+
+        elif choice == '3':
+            print("Volviendo al menú inicial...")
+            break
+
+        else:
+            print("Opción no válida. Intente nuevamente.")
+
+# ================== MAIN ==================
+
+def main():
+    while True:
+        choice = display_main_menu()
+
+        if choice == '1':
+            prolog_mode()
+
+        elif choice == '2':
+            a_star_mode()
+
+        elif choice == '3':
             print("Saliendo del programa...")
             break
-        
+
         else:
-            print("Opción no válida. Por favor intente nuevamente.")
+            print("Opción no válida. Intente nuevamente.")
 
 if __name__ == "__main__":
     main()

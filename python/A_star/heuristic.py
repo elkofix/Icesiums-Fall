@@ -1,4 +1,4 @@
-from map import room_coords
+from .map import room_coords
 
 def manhattan_heuristic(current, goal):
     x1, y1 = room_coords.get(current, (0, 0))

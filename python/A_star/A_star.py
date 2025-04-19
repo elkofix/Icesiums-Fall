@@ -1,6 +1,6 @@
 import heapq
-from map import doors, keys_in_rooms, trap_room, trap_limit, inventory_limit, max_moves
-from heuristic import manhattan_heuristic, has_key
+from .map import doors, keys_in_rooms, trap_room, trap_limit, inventory_limit, max_moves
+from .heuristic import manhattan_heuristic, has_key
 
 def a_star_escape(start, goal):
     open_list = []
