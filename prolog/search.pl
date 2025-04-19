@@ -1,44 +1,52 @@
-% search.pl
 :- module(search, [
-    find_solution/1,
-    bfs/3
+    find_escape_solution/0
 ]).
 
 :- use_module(state).
 :- use_module(facts).
-:- use_module(rules).
 :- use_module(constraints).
-:- use_module(library(clpfd)).
 
-% Main predicate to find solution from room A to room D
-find_solution(Steps) :-
-    % Define the initial state
+% Main function to find escape solution
+find_escape_solution :-
+    writeln('Searching for escape solution...'),
+    % Get the starting room and final room
+    state:player_location(StartRoom),
+    facts:final_room(FinalRoom),
+    format('Planning escape from ~w to ~w~n', [StartRoom, FinalRoom]),
+    
+    % Define the initial state based on player's current location
     % State format: state(CurrentRoom, Inventory, UnlockedDoors, SolvedPuzzles, MovedObjects, CollectedPieces)
-    InitialState = state(a, [], [], [], [], []),
+    InitialState = state(StartRoom, [], [], [], [], []),
     
-    % Goal is to reach room d
-    bfs(InitialState, GoalState, Steps),
-    
-    % Verify we reached the goal (room d)
-    GoalState = state(d, _, _, _, _, _).
+    % Run BFS to find a solution
+    (bfs(InitialState, GoalState, Solution) ->
+        format('Solution found! Steps to escape: ~n'),
+        print_solution(Solution),
+        format('Total steps required: ~w~n', [length(Solution)])
+    ;
+        writeln('No escape solution found! The room might be unsolvable.')
+    ).
 
-% BFS implementation to find a path from InitialState to a state satisfying the goal
+% BFS implementation to find a path from InitialState to the final room
 bfs(InitialState, GoalState, Steps) :-
+    % Get the defined final room
+    facts:final_room(FinalRoom),
     % Queue format: [queueItem(State, PathToState)]
     InitialQueue = [queueItem(InitialState, [])],
-    bfs_loop(InitialQueue, [], GoalState, Steps).
+    bfs_loop(InitialQueue, [], FinalRoom, GoalState, Steps).
 
 % BFS loop - empty queue means no solution found
-bfs_loop([], _, _, _) :- 
+bfs_loop([], _, _, _, _) :- 
     writeln('No solution found!'),
     fail.
 
 % Found goal state - return the path
-bfs_loop([queueItem(State, Path)|_], Visited, State, Path) :-
-    State = state(d, _, _, _, _, _), !.  % Goal is to reach room d
+bfs_loop([queueItem(State, Path)|_], Visited, FinalRoom, State, Path) :-
+    State = state(Room, _, _, _, _, _),
+    Room = FinalRoom, !.  % Goal is to reach the final room
 
 % Process the next state in the queue
-bfs_loop([queueItem(State, Path)|Queue], Visited, GoalState, Steps) :-
+bfs_loop([queueItem(State, Path)|Queue], Visited, FinalRoom, GoalState, Steps) :-
     % If already visited this state, skip
     \+ member(State, Visited),
     
@@ -53,11 +61,11 @@ bfs_loop([queueItem(State, Path)|Queue], Visited, GoalState, Steps) :-
     add_to_queue(Transitions, Path, Queue, NewQueue),
     
     % Add current state to visited
-    bfs_loop(NewQueue, [State|Visited], GoalState, Steps).
+    bfs_loop(NewQueue, [State|Visited], FinalRoom, GoalState, Steps).
 
 % Skip already visited states
-bfs_loop([_|Queue], Visited, GoalState, Steps) :-
-    bfs_loop(Queue, Visited, GoalState, Steps).
+bfs_loop([_|Queue], Visited, FinalRoom, GoalState, Steps) :-
+    bfs_loop(Queue, Visited, FinalRoom, GoalState, Steps).
 
 % Add new states to the queue with their paths
 add_to_queue([], _, Queue, Queue).
@@ -69,11 +77,14 @@ add_to_queue([(NextState, Action)|Rest], Path, Queue, FinalQueue) :-
     % Process remaining transitions
     add_to_queue(Rest, Path, TempQueue, FinalQueue).
 
+% Print solution in a readable format
+print_solution([]) :- !.
+print_solution([Action|Rest]) :-
+    format('- ~w~n', [Action]),
+    print_solution(Rest).
+
 % Define all possible actions from a given state
 % State format: state(CurrentRoom, Inventory, UnlockedDoors, SolvedPuzzles, MovedObjects, CollectedPieces)
-
-print_full_solution(Steps) :-
-    write_canonical(Steps), nl.
 
 % Action: Move to another room
 possible_action(
@@ -178,7 +189,7 @@ count_keys(Inventory, Count) :-
     length(Keys, Count).
 
 % Check if item is a key
-is_key(Key) :- facts:key(Key).
+is_key(Key) :- atom(Key), sub_atom(Key, 0, 3, _, 'key').
 
 % Count puzzle pieces
 count_pieces(CollectedPieces, Count) :-

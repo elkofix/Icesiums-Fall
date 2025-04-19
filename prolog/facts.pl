@@ -9,7 +9,7 @@
     add_room/1, add_door/3, add_key/2,
     add_object/2, add_puzzle/1, add_piece/2,
     hide_piece/3, set_puzzle_room/2,
-    set_door_requirements/3,
+    set_door_requirements/3, set_final_room/1,
     % Game configuration functions
     clear_game_data/0,
     load_predefined_game/0,
@@ -59,6 +59,10 @@ add_visible_piece(Room, Piece, Puzzle) :-
     assertz(piece_in_room(Room, Piece, Puzzle)),
     assertz(piece_location(Puzzle, Piece, Room)).
 
+set_final_room(Room) :-
+    retractall(final_room(_)),
+    assertz(final_room(Room)).
+
 % Function to clean all game data
 clear_game_data :-
     retractall(room(_)),
@@ -71,7 +75,8 @@ clear_game_data :-
     retractall(puzzle_room(_, _)),
     retractall(door_requirements(_, _, _)),
     retractall(puzzle(_)),
-    retractall(piece_in_room(_, _, _)).
+    retractall(piece_in_room(_, _, _)),
+    retractall(final_room(_)).
 
 % Load the predefined game setup
 load_predefined_game :-
@@ -79,7 +84,8 @@ load_predefined_game :-
     
     % Add rooms
     add_room(a), add_room(b), add_room(c), add_room(d),
-    
+    set_final_room(d),
+
     % Add doors
     add_door(a, b, locked),
     add_door(b, a, locked),
@@ -272,10 +278,25 @@ custom_game_door_requirements :-
     read(ReqInput),
     (ReqInput = done ->
         writeln('Door requirements setup complete.'),
-        writeln('Custom game created successfully!')
+        custom_game_final_room
     ;
         ReqInput = From-To-Reqs,
         set_door_requirements(From, To, Reqs),
         writeln('Door requirement set. Enter another door requirement or "done":'),
         custom_game_door_requirements
+    ).
+
+custom_game_final_room :-
+    writeln('Finally, which room is the final goal (exit) room?'),
+    findall(R, room(R), Rooms),
+    format('Available rooms: ~w~n', [Rooms]),
+    read(FinalRoom),
+    (room(FinalRoom) ->
+        set_final_room(FinalRoom),
+        writeln('Final room set successfully!'),
+        writeln('Custom game created successfully!')
+    ;
+        writeln('Invalid room. Please choose from the available rooms:'),
+        format('~w~n', [Rooms]),
+        custom_game_final_room
     ).

@@ -1,4 +1,4 @@
-% constraints.pl
+% constraints.pl - Modified for dynamic constraints
 :- module(constraints, [
     max_moves/1,
     max_b_visits/1,
@@ -13,7 +13,15 @@
     check_trap/1,
     check_inventory_limit/1,
     initialize_constraints/0,
-    count_items_of_type/2
+    count_items_of_type/2,
+    % New dynamic constraint functions
+    set_max_moves/1,
+    set_max_b_visits/1,
+    set_carry_limit/2,
+    add_room_trap/2,
+    clear_constraints/0,
+    load_default_constraints/0,
+    create_custom_constraints/0
 ]).
 
 :- use_module(library(clpfd)).
@@ -27,25 +35,94 @@
 :- dynamic move_count/1.
 :- dynamic turns_in_room/2.
 
-% Default constraints
-max_moves(30).  % Default maximum number of moves
-max_b_visits(3).  % Maximum visits to room B
+% Dynamic constraint modification functions
+set_max_moves(Limit) :-
+    retractall(max_moves(_)),
+    assertz(max_moves(Limit)).
 
-% Inventory limits for different item types
-can_carry(key, 2).    % Can carry up to 2 keys
-can_carry(piece, 4).  % Can carry up to 4 puzzle pieces
+set_max_b_visits(Limit) :-
+    retractall(max_b_visits(_)),
+    assertz(max_b_visits(Limit)).
 
-% Room traps
-trap(c, turns(3)).  % Room C has a trap that activates after 3 turns
+set_carry_limit(ItemType, Limit) :-
+    retractall(can_carry(ItemType, _)),
+    assertz(can_carry(ItemType, Limit)).
+
+add_room_trap(Room, TurnLimit) :-
+    retractall(trap(Room, _)),
+    assertz(trap(Room, turns(TurnLimit))).
+
+% Clear all constraints
+clear_constraints :-
+    retractall(max_moves(_)),
+    retractall(max_b_visits(_)),
+    retractall(can_carry(_, _)),
+    retractall(trap(_, _)).
+
+% Load default constraints
+load_default_constraints :-
+    clear_constraints,
+    % Default maximum moves
+    set_max_moves(30),
+    % Default maximum visits to room B
+    set_max_b_visits(3),
+    % Default inventory limits
+    set_carry_limit(key, 2),
+    set_carry_limit(piece, 4),
+    % Default room traps
+    add_room_trap(c, 3).
+
+% Interactive constraint setup
+create_custom_constraints :-
+    clear_constraints,
+    writeln('Let\'s set up game constraints.'),
+    
+    % Set max moves
+    writeln('Enter maximum moves allowed (default is 30):'),
+    read(MaxMoves),
+    set_max_moves(MaxMoves),
+    
+    % Set max B visits
+    writeln('Enter maximum visits to room b (default is 3):'),
+    read(MaxBVisits),
+    set_max_b_visits(MaxBVisits),
+    
+    % Set key carry limit
+    writeln('Enter maximum keys player can carry (default is 2):'),
+    read(KeyLimit),
+    set_carry_limit(key, KeyLimit),
+    
+    % Set piece carry limit
+    writeln('Enter maximum puzzle pieces player can carry (default is 4):'),
+    read(PieceLimit),
+    set_carry_limit(piece, PieceLimit),
+    
+    % Set room traps
+    writeln('Do you want to add room traps? (yes/no):'),
+    read(AddTraps),
+    (AddTraps = yes ->
+        custom_room_traps
+    ;
+        writeln('No traps will be added.')
+    ),
+    
+    writeln('Custom constraints have been set successfully!').
+
+% Helper for adding room traps
+custom_room_traps :-
+    writeln('Enter room and turn limit for trap (format: room-turns) or "done":'),
+    read(TrapInput),
+    (TrapInput = done ->
+        writeln('Trap setup complete.')
+    ;
+        TrapInput = Room-Turns,
+        add_room_trap(Room, Turns),
+        writeln('Trap added. Enter another trap or "done":'),
+        custom_room_traps
+    ).
 
 % Current move counter
 move_count(0).
-
-% Turns spent in each room
-turns_in_room(a, 0).
-turns_in_room(b, 0).
-turns_in_room(c, 0).
-turns_in_room(d, 0).
 
 % Increment the global move counter
 increment_move_count :-
@@ -104,16 +181,14 @@ count_items_of_type(piece, Count) :-
     findall(Piece-Puzzle, state:has_piece(Puzzle, Piece), Pieces),
     length(Pieces, Count).
 
-% Initialize constraints at game start
+% Initialize constraints for all rooms in the game
 initialize_constraints :-
     retractall(move_count(_)),
     assertz(move_count(0)),
     retractall(turns_in_room(_, _)),
-    assertz(turns_in_room(a, 0)),
-    assertz(turns_in_room(b, 0)),
-    assertz(turns_in_room(c, 0)),
-    assertz(turns_in_room(d, 0)).
-
+    % Initialize turn counters for all defined rooms
+    findall(Room, facts:room(Room), Rooms),
+    forall(member(R, Rooms), assertz(turns_in_room(R, 0))).
 
 % Check if the current state is valid
 % This predicate checks if the current state of the game is valid based on the constraints defined above.
@@ -123,7 +198,7 @@ valid_state(Room, Keys, Moves, BVisits) :-
     Moves =< MaxMoves,
     
     % Verificar límite de visitas a B si estamos en esa habitación
-    (Room == 'B' -> 
+    (Room == b -> 
         max_b_visits(MaxB),
         BVisits =< MaxB
     ; true),
@@ -132,10 +207,10 @@ valid_state(Room, Keys, Moves, BVisits) :-
     valid_keys(Keys),
     
     % Verificar que la habitación existe
-    room(Room).
+    facts:room(Room).
 
 % Predicado auxiliar para validar llaves
 valid_keys([]).
 valid_keys([Key|Rest]) :-
-    (key_in_room(_, Key) ; has_key(Key)), 
+    (facts:key_in_room(_, Key) ; state:has_key(Key)), 
     valid_keys(Rest).

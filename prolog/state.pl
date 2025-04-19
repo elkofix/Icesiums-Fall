@@ -31,6 +31,98 @@ inventory([]).
 :- forall(facts:door(X, Y, State), assertz(door_state(X, Y, State))).
 
 % Move player between rooms with constraint checks
+
+% Add to facts.pl - Add the final room predicate
+:- dynamic final_room/1.
+
+% Update module exports in facts.pl
+:- module(facts, [
+    room/1, door/3, key_in_room/2,
+    object_in_room/2, hides_piece/3, piece/2,
+    piece_location/3, puzzle_room/2,
+    door_requirements/3, puzzle/1,
+    piece_in_room/3, final_room/1,
+    % Dynamic definition functions
+    add_room/1, add_door/3, add_key/2,
+    add_object/2, add_puzzle/1, add_piece/2,
+    hide_piece/3, set_puzzle_room/2,
+    set_door_requirements/3, set_final_room/1,
+    % Game configuration functions
+    clear_game_data/0,
+    load_predefined_game/0,
+    create_custom_game/0
+]).
+
+% Add the new function to set the final room
+set_final_room(Room) :-
+    retractall(final_room(_)),
+    assertz(final_room(Room)).
+
+% Update clear_game_data in facts.pl to also clear final_room
+clear_game_data :-
+    retractall(room(_)),
+    retractall(door(_, _, _)),
+    retractall(key_in_room(_, _)),
+    retractall(object_in_room(_, _)),
+    retractall(hides_piece(_, _, _)),
+    retractall(piece(_, _)),
+    retractall(piece_location(_, _, _)),
+    retractall(puzzle_room(_, _)),
+    retractall(door_requirements(_, _, _)),
+    retractall(puzzle(_)),
+    retractall(piece_in_room(_, _, _)),
+    retractall(final_room(_)).
+
+% Update load_predefined_game to set the final room
+load_predefined_game :-
+    clear_game_data,
+    
+    % Add rooms
+    add_room(a), add_room(b), add_room(c), add_room(d),
+    
+    % Set final room
+    set_final_room(d),
+    
+    % Rest of the predefined game setup...
+    % [Keep all the existing code here]
+
+% Update create_custom_game to include final room setup after door requirements
+custom_game_door_requirements :-
+    writeln('Finally, let\'s set the requirements for each door.'),
+    writeln('Format: from_room-to_room-[req1,req2,...] or "done":'),
+    writeln('Requirements can be has_key(KeyName) or puzzle_solved(PuzzleName)'),
+    read(ReqInput),
+    (ReqInput = done ->
+        writeln('Door requirements setup complete.'),
+        custom_game_final_room
+    ;
+        ReqInput = From-To-Reqs,
+        set_door_requirements(From, To, Reqs),
+        writeln('Door requirement set. Enter another door requirement or "done":'),
+        custom_game_door_requirements
+    ).
+
+% Add new function to set final room in custom game
+custom_game_final_room :-
+    writeln('Finally, which room is the final goal (exit) room?'),
+    findall(R, room(R), Rooms),
+    format('Available rooms: ~w~n', [Rooms]),
+    read(FinalRoom),
+    (room(FinalRoom) ->
+        set_final_room(FinalRoom),
+        writeln('Final room set successfully!'),
+        writeln('Custom game created successfully!')
+    ;
+        writeln('Invalid room. Please choose from the available rooms:'),
+        format('~w~n', [Rooms]),
+        custom_game_final_room
+    ).
+
+% Update state.pl - Modify move_player to check for win condition
+% Add to beginning of state.pl module declarations
+:- use_module(facts).
+
+% Update move_player predicate
 move_player(NewRoom) :-
     constraints:check_move_limit,
     player_location(Current),
@@ -43,9 +135,19 @@ move_player(NewRoom) :-
     assertz(player_location(NewRoom)),
     % Show move confirmation
     format("You moved from ~w to ~w.~n", [Current, NewRoom]),
+    % Check if this is the final room
+    (facts:final_room(NewRoom) ->
+        constraints:move_count(Moves),
+        writeln("*********************************************"),
+        writeln("*   CONGRATULATIONS! YOU HAVE ESCAPED!     *"),
+        writeln("*********************************************"),
+        format("You reached the exit room ~w in ~w moves!~n", [NewRoom, Moves]),
+        writeln("Type 'init_game.' to play again.")
+    ;
+        % Not final room, continue normally
+        true
+    ),
     !.
-move_player(NewRoom) :-
-    format("You cannot move to room ~w. The door is locked.~n", [NewRoom]).
 
 % Check if player has a key
 has_key(Key) :-

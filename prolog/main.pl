@@ -3,6 +3,7 @@
 :- use_module(facts).
 :- use_module(rules).
 :- use_module(constraints).
+:- use_module(search).
 :- use_module(library(clpfd)).
 
 % Start game function - ask user for game type
@@ -15,9 +16,11 @@ start_game :-
     read(Choice),
     (Choice = 1 ->
         facts:load_predefined_game,
+        constraints:load_default_constraints,
         rules:initialize_game
     ; Choice = 2 ->
         facts:create_custom_game,
+        constraints:create_custom_constraints,
         rules:initialize_game
     ;
         writeln("Invalid choice. Please enter 1 or 2."),
@@ -38,12 +41,14 @@ help :-
     writeln("- puzzle_status(Puzzle). : Check status of a puzzle"),
     writeln("- solve_puzzle(Puzzle). : Try to solve a puzzle (consumes pieces)"),
     writeln("- unlock_door(From, To). : Unlock a door (consumes keys)"),
-    writeln("- init_game. : Reset the game"),
+    writeln("- init_game. : Reset the current game"),
     writeln("- game_stats. : View game statistics and constraints"),
-    writeln("- find_escape_plan. : Find the solution to escape to room D"),
+    writeln("- find_escape_plan. : Find the solution to escape"),
     writeln("- help. : Show this help"),
+    writeln("- start_game. : Start a new game (predefined or custom)"),
     writeln("- create_custom_game. : Create a new custom escape room"),
-    writeln("- load_predefined_game. : Load the predefined escape room").
+    writeln("- load_predefined_game. : Load the predefined escape room"),
+    writeln("- modify_constraints. : Modify the current game constraints").
 
 % Look around the current room
 look :-
@@ -197,16 +202,27 @@ game_stats :-
 % Create custom game command
 create_custom_game :-
     facts:create_custom_game,
+    constraints:create_custom_constraints,
     rules:initialize_game.
 
 % Load predefined game command
 load_predefined_game :-
     facts:load_predefined_game,
+    constraints:load_default_constraints,
     rules:initialize_game.
+
+% Modify constraints command
+modify_constraints :-
+    constraints:create_custom_constraints,
+    writeln("Game constraints have been updated.").
 
 % Alias for init_game
 init_game :-
     rules:initialize_game.
+
+% Find escape plan - Now calls the search module
+find_escape_plan :-
+    search:find_escape_solution.
 
 % Entry point
 :- initialization(start_game).
