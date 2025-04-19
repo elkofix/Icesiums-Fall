@@ -14,7 +14,7 @@ find_escape_solution :-
     facts:final_room(FinalRoom),
     format('Planning escape from ~w to ~w~n', [StartRoom, FinalRoom]),
     
-    % Define the initial state based on player's current location
+    % Define the initial state based on players current location
     % State format: state(CurrentRoom, Inventory, UnlockedDoors, SolvedPuzzles, MovedObjects, CollectedPieces)
     InitialState = state(StartRoom, [], [], [], [], []),
     
@@ -132,7 +132,7 @@ possible_action(
         % Add piece to collected pieces
         append([(Puzzle, Piece)], CollectedPieces, NewCollectedPieces)
     ;
-        % If no piece or can't carry more, just add object to moved objects
+        % If no piece or cant carry more, just add object to moved objects
         \+ facts:hides_piece(Object, _, _),
         NewCollectedPieces = CollectedPieces
     ).
