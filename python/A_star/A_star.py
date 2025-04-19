@@ -1,39 +1,6 @@
 import heapq
-
-# Mapa
-rooms = ["A", "B", "C", "D"]
-doors = {
-    "A": {"B": "locked(key1)"},
-    "B": {"A": "unlocked", "C": "locked(key2)"},
-    "C": {"B": "unlocked", "D": "unlocked"},
-}
-keys_in_rooms = {
-    "A": ["key1"],
-    "B": ["key2"],
-}
-trap_room = "B"
-trap_limit = 3
-inventory_limit = 2
-max_moves = 30
-
-
-def print_result(name, path):
-    if path:
-        print(f"{name}: Ruta encontrada -> {' -> '.join(path)}")
-    else:
-        print(f"{name}: No se encontró ruta válida")
-
-
-def manhattan_heuristic(current, goal):
-    coords = {"A": (0, 0), "B": (1, 0), "C": (2, 0), "D": (3, 0)}
-    x1, y1 = coords[current]
-    x2, y2 = coords[goal]
-    return abs(x1 - x2) + abs(y1 - y2)
-
-
-def has_key(inventory, key_needed):
-    return key_needed in inventory
-
+from map import doors, keys_in_rooms, trap_room, trap_limit, inventory_limit, max_moves
+from heuristic import manhattan_heuristic, has_key
 
 def a_star_escape(start, goal):
     open_list = []
@@ -54,13 +21,13 @@ def a_star_escape(start, goal):
             if key not in new_inventory and len(new_inventory) < inventory_limit:
                 new_inventory.append(key)
 
-        # Contar visitas a la sala trampa
+        # Trampa
         if current == trap_room:
             new_visits[trap_room] += 1
             if new_visits[trap_room] > trap_limit:
                 continue
 
-        # Expandir vecinos
+        # Vecinos
         for neighbor, door in doors.get(current, {}).items():
             if door == "unlocked":
                 passable = True
@@ -82,9 +49,3 @@ def a_star_escape(start, goal):
                 )
 
     return None
-
-
-# Ejecutar prueba
-print("=== Búsqueda A* con llaves y trampa ===")
-result = a_star_escape("A", "D")
-print_result("A*", result)
