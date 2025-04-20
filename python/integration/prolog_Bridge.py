@@ -1,7 +1,8 @@
 from pyswip import Prolog
 import os
 from pathlib import Path
-import re
+import sys
+import time
 
 class PrologBridge:
     def __init__(self):
@@ -10,92 +11,142 @@ class PrologBridge:
         self._load_essential_files()
     
     def _configure_prolog(self):
-        """Configuración inicial de Prolog para mejor rendimiento"""
-        self.prolog.query("set_prolog_flag(stack_limit, 16_000_000)")
-        self.prolog.query("set_prolog_flag(toplevel_print_options, [quoted(true), portray(true), max_depth(1000)])")
-    
-    def _load_essential_files(self):
-        """Carga los archivos Prolog en el orden correcto"""
-        base_dir = Path(__file__).parent.parent.parent
-        prolog_dir = base_dir / "prolog"
-        
-        load_order = [
-            "facts.pl",
-            "state.pl", 
-            "constraints.pl",
-            "rules.pl",
-            "search.pl"
-        ]
-        
-        for file in load_order:
-            file_path = prolog_dir / file
-            query = f"consult('{file_path.as_posix()}')"
-            list(self.prolog.query(query))
-
-    def initialize_game(self, choice=1):
-        """Inicializa el juego según la elección del usuario"""
-        if choice == 1:
-            query = "facts:load_predefined_game, constraints:load_default_constraints, rules:initialize_game"
-        elif choice == 2:
-            query = "facts:create_custom_game, constraints:create_custom_constraints, rules:initialize_game"
-        else:
-            raise ValueError("La elección debe ser 1 (predefinido) o 2 (personalizado)")
-        
-        return bool(list(self.prolog.query(query)))
-
-    def find_escape_plan(self):
-        """
-        Ejecuta el BFS de Prolog y captura la solución completa
-        """
+        """Configuración optimizada que no requiere cambios en los archivos .pl"""
         try:
-            # Primero obtener la salida cruda del BFS
-            output = list(self.prolog.query(
-                "with_output_to(codes(Codes), search:find_escape_solution), "
-                "atom_codes(Output, Codes)"
-            ))[0]['Output']
-            
-            # Procesar la salida para extraer los pasos
-            return self._parse_solution(output)
+            # Configuración agresiva de memoria
+            self.prolog.query("set_prolog_flag(stack_limit, 256_000_000)")  # 256MB
+            self.prolog.query("set_prolog_flag(trail_limit, 128_000_000)")  # 128MB trail
+            self.prolog.query("set_prolog_flag(optimise, true)")
+            self.prolog.query("set_prolog_flag(gc, true)")
         except Exception as e:
-            print(f"Error al buscar solución: {str(e)}")
+            print(f"Config warning: {str(e)}")
+
+    def _load_essential_files(self):
+        """Carga de archivos sin modificar los .pl existentes"""
+        try:
+            base_dir = Path(__file__).parent.parent.parent
+            prolog_dir = base_dir / "prolog"
+            
+            if not prolog_dir.exists():
+                raise FileNotFoundError(f"Carpeta 'prolog' no encontrada en: {prolog_dir}")
+
+         
+            files_to_load = [
+                "facts.pl",
+                "state.pl", 
+                "constraints.pl",
+                "rules.pl",
+                "search.pl",
+                "main.pl"
+            ]
+            
+            for file in files_to_load:
+                file_path = prolog_dir / file
+                if file_path.exists():
+                    query = f"consult('{file_path.resolve().as_posix()}')"
+                    if not list(self.prolog.query(query)):
+                        print(f"Warning: File {file} loaded with issues")
+                else:
+                    print(f"Warning: Missing {file}")
+
+        except Exception as e:
+            print(f"CRITICAL: {str(e)}")
+            sys.exit(1)
+
+    def find_escape_plan(self, time_limit=120):
+        """Búsqueda con protección de recursos sin cambiar el código Prolog"""
+        try:
+            # Triple protección de recursos
+            self.prolog.query("garbage_collect")
+            self.prolog.query(f"set_prolog_flag(stack_limit, 256_000_000)")
+            
+            query = f"""
+                call_with_time_limit({time_limit},
+                    with_output_to(
+                        codes(Codes),
+                        find_escape_solution
+                    )
+                ),
+                atom_codes(Output, Codes)
+            """
+            
+            start_time = time.time()
+            result = list(self.prolog.query(query))
+            exec_time = time.time() - start_time
+            
+            if not result:
+                print(f"Búsqueda terminada (límite: {time_limit}s)")
+                return None
+                
+            solution = self._parse_solution(result[0]['Output'])
+            print(f"Búsqueda completada en {exec_time:.2f}s")
+            return solution
+            
+        except Exception as e:
+            print(f"Error controlado: {str(e)}")
             return None
 
     def _parse_solution(self, output):
-        """
-        Parsea la salida de Prolog para extraer los pasos de la solución
-        """
-        # Buscar líneas que comienzan con "- " (los pasos de la solución)
-        steps = []
-        solution_section = False
-        
-        for line in output.split('\n'):
-            if "Steps to escape:" in line:
-                solution_section = True
-                continue
-            elif "Total steps required:" in line:
-                break
-                
-            if solution_section and line.strip().startswith("- "):
-                steps.append(line.strip()[2:])
-        
-        return steps if steps else None
+        """Parseo compatible con tu salida Prolog existente"""
+        if not output:
+            return None
+            
+        try:
+            steps = []
+            lines = output.split('\n')
+            
+            for line in lines:
+                if line.strip().startswith("- "):
+                    steps.append(line.strip()[2:])
+                elif "Total steps required:" in line:
+                    break
+                    
+            return steps if steps else None
+            
+        except Exception as e:
+            print(f"Parse error: {str(e)}")
+            return None
+
+    def initialize_game(self, choice=1):
+        """Inicialización que no modifica los .pl"""
+        try:
+            self.prolog.query("garbage_collect")
+            
+            if choice == 1:
+                return bool(list(self.prolog.query("""
+                    facts:load_predefined_game,
+                    constraints:load_default_constraints,
+                    rules:initialize_game
+                """)))
+            elif choice == 2:
+                return bool(list(self.prolog.query("""
+                    facts:create_custom_game,
+                    constraints:create_custom_constraints,
+                    rules:initialize_game
+                """)))
+            return False
+            
+        except Exception as e:
+            print(f"Init error: {str(e)}")
+            return False
 
     def get_current_state(self):
-        """Obtiene el estado actual del juego"""
+        """Consulta compatible con tu state.pl"""
         try:
-            return {
-                'room': self._query_single("state:player_location(Room)", "Room"),
-                'inventory': self._query_list("state:inventory(Items)", "Items"),
-                'solved_puzzles': self._query_list("state:puzzle_solved(Puzzle)", "Puzzle")
-            }
-        except:
+            result = list(self.prolog.query("""
+                state:player_location(Room),
+                state:inventory(Inv),
+                findall(P, state:puzzle_solved(P), Puzzles)
+            """))
+            
+            if result:
+                return {
+                    'room': result[0]['Room'],
+                    'inventory': result[0]['Inv'],
+                    'solved_puzzles': result[0]['Puzzles']
+                }
             return None
-    
-    def _query_single(self, query, var_name):
-        """Consulta que retorna un solo valor"""
-        result = list(self.prolog.query(query))
-        return result[0][var_name] if result else None
-    
-    def _query_list(self, query, var_name):
-        """Consulta que retorna una lista de valores"""
-        return [res[var_name] for res in self.prolog.query(query)]
+            
+        except Exception as e:
+            print(f"State error: {str(e)}")
+            return None
