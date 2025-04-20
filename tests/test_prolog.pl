@@ -14,4 +14,3 @@
 % state:unlock_door(b, c).
 % state:move_player(c).
 % state:go_to_hanoi.
-% state:move_disk(1,2). % etc...
