@@ -2,7 +2,15 @@ import heapq
 from .map import doors, keys_in_rooms, trap_room, trap_limit, inventory_limit, max_moves, room_costs
 from .heuristic import manhattan_heuristic, has_key
 
-def a_star_escape(start, goal):
+def a_star_escape(start, goal, game_data):
+    doors = game_data["doors"]
+    keys_in_rooms = game_data["keys_in_rooms"]
+    room_coords = game_data["room_coords"]
+    trap_room = game_data["trap_room"]
+    trap_limit = game_data["trap_limit"]
+    inventory_limit = game_data["inventory_limit"]
+    max_moves = game_data["max_moves"]
+    room_costs = game_data["room_costs"]
     open_list = []
     heapq.heappush(open_list, (0, 0, start, [], [], {trap_room: 0}))  # f, g, current, path, inventory, visits
 

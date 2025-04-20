@@ -1,0 +1,38 @@
+{
+  "doors": {
+    "A": { "B": "unlocked" },
+    "B": { "C": "locked(key1)" },
+    "C": { "D": "unlocked" },
+    "D": { "E": "unlocked" },
+    "E": { "F": "unlocked" },
+    "F": { "G": "unlocked" },
+    "G": { "H": "locked(key2)" }
+  },
+  "keys_in_rooms": {
+    "A": ["key1"],
+    "F": ["key2"]
+  },
+  "room_coords": {
+    "A": [0, 0],
+    "B": [1, 0],
+    "C": [2, 0],
+    "D": [3, 0],
+    "E": [4, 0],
+    "F": [5, 0],
+    "G": [6, 0],
+    "H": [7, 0]
+  },
+  "trap_room": "C",
+  "trap_limit": 1,
+  "inventory_limit": 3,
+  "max_moves": 50,
+  "room_costs": {
+    "(A, B)": 1,
+    "(B, C)": 2,
+    "(C, D)": 2,
+    "(D, E)": 1,
+    "(E, F)": 3,
+    "(F, G)": 1,
+    "(G, H)": 1
+  }
+}
