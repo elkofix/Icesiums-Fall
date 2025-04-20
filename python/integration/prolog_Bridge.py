@@ -14,10 +14,7 @@ class PrologBridge:
         """Configuración optimizada que no requiere cambios en los archivos .pl"""
         try:
             # Configuración agresiva de memoria
-            self.prolog.query("set_prolog_flag(stack_limit, 256_000_000)")  # 256MB
-            self.prolog.query("set_prolog_flag(trail_limit, 128_000_000)")  # 128MB trail
-            self.prolog.query("set_prolog_flag(optimise, true)")
-            self.prolog.query("set_prolog_flag(gc, true)")
+            self.prolog.query("set_prolog_flag(trail_limit, 8_589_934_592)")  # 128MB trail
         except Exception as e:
             print(f"Config warning: {str(e)}")
 
@@ -58,17 +55,16 @@ class PrologBridge:
         try:
             # Triple protección de recursos
             self.prolog.query("garbage_collect")
-            self.prolog.query(f"set_prolog_flag(stack_limit, 256_000_000)")
+            self.prolog.query(f"set_prolog_flag(stack_limit, 8_589_934_592)")
             
-            query = f"""
-                call_with_time_limit({time_limit},
-                    with_output_to(
-                        codes(Codes),
-                        find_escape_solution
-                    )
+            query = """
+                with_output_to(
+                    codes(Codes),
+                    find_escape_solution
                 ),
                 atom_codes(Output, Codes)
             """
+
             
             start_time = time.time()
             result = list(self.prolog.query(query))
