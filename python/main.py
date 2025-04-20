@@ -1,5 +1,5 @@
 from integration.prolog_Bridge import PrologBridge
-from A_star.A_star import a_star_escape
+from A_star.a_star import a_star_escape
 
 def display_main_menu():
     print("\n===== Menú Inicial =====")
