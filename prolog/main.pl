@@ -7,11 +7,33 @@
 :- use_module(search).
 :- use_module(search_no_constraints).
 :- use_module(a_star).
+:- use_module(adversary).
 :- use_module(library(clpfd)).
+:- dynamic game_mode/1. 
 
-% Start game function - ask user for game type
+% Start game function - first ask for game mode, then game type
 start_game :-
     writeln("Welcome to the Dynamic Prolog Escape Room!"),
+    writeln("Do you want to play with an adversary?"),
+    writeln("1. No - Standard mode"),
+    writeln("2. Yes - Adversary mode"),
+    writeln("Enter your choice (1 or 2):"),
+    read(ModeChoice),
+    (ModeChoice = 1 ->
+        retractall(game_mode(_)),
+        assertz(game_mode(standard)),
+        choose_game_type
+    ; ModeChoice = 2 ->
+        retractall(game_mode(_)),
+        assertz(game_mode(adversary)),
+        choose_game_type
+    ;
+        writeln("Invalid choice. Please enter 1 or 2."),
+        start_game
+    ).
+
+% Choose game type (predefined or custom)
+choose_game_type :-
     writeln("Choose an option:"),
     writeln("1. Load predefined game"),
     writeln("2. Create custom game"),
@@ -27,7 +49,7 @@ start_game :-
         rules:initialize_game
     ;
         writeln("Invalid choice. Please enter 1 or 2."),
-        start_game
+        choose_game_type
     ).
 
 % Help command
@@ -46,9 +68,19 @@ help :-
     writeln("- unlock_door(From, To). : Unlock a door (consumes keys)"),
     writeln("- init_game. : Reset the current game"),
     writeln("- game_stats. : View game statistics and constraints"),
-    writeln("- find_escape_plan. : Find the solution to escape"),
-    writeln("- find_escape_plan_no_constraints. : Find the solution ignoring inventory limits"),
-    writeln("- find_escape_plan_a_star. : Find the solution using A* algorithm"),
+    % Display different search options based on game mode
+    game_mode(Mode),
+    (Mode = standard ->
+        writeln("- find_escape_plan. : Find the solution to escape"),
+        writeln("- find_escape_plan_no_constraints. : Find the solution ignoring inventory limits"),
+        writeln("- find_escape_plan_a_star. : Find the solution using A* algorithm")
+    ; Mode = adversary ->
+        writeln("- find_escape_plan. : Find the solution to escape"),
+        writeln("- find_escape_plan_no_constraints. : Find the solution ignoring inventory limits"),
+        writeln("- find_escape_plan_a_star. : Find the solution using A* algorithm")
+        writeln("- guard_location. : Show current guard location")
+    ),
+    
     writeln("- help. : Show this help"),
     writeln("- start_game. : Start a new game (predefined or custom)"),
     writeln("- create_custom_game. : Create a new custom escape room"),
@@ -59,6 +91,17 @@ help :-
 look :-
     state:player_location(Room),
     format("You are in room ~w.~n~n", [Room]),
+    
+    (main:game_mode(adversary),
+     adversary:guard_location(GuardRoom) ->
+        (Room = GuardRoom ->
+            writeln("\n¡ALERTA! El guardia está en esta habitación contigo.")
+        ;
+            format("El guardia está actualmente en la habitación ~w.~n", [GuardRoom])
+        )
+    ;
+        true
+    ),
     
     % Display turn count for this room
     constraints:turns_in_room(Room, Turns),
@@ -234,6 +277,14 @@ find_escape_plan_no_constraints :-
 
 find_escape_plan_a_star :-
     a_star:find_escape_solution.
+
+guard_location :-
+    main:game_mode(adversary),
+    adversary:guard_location(Room),
+    format("El guardia está actualmente en la habitación ~w.~n", [Room]).
+guard_location :-
+    \+ main:game_mode(adversary),
+    writeln("No hay guardia en el modo de juego estándar.").
 
 % Entry point
 :- initialization(start_game).
