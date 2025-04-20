@@ -19,14 +19,16 @@ def display_prolog_menu():
     print("5. Volver al menú inicial")
     return input("Seleccione una opción: ")
 
-def display_solution(steps):
+def display_solution(steps, cost=0):
     if steps:
         print("\n=== Plan de Escape ===")
         for i, step in enumerate(steps, 1):
             print(f"{i}. {step}")
         print(f"\nTotal de pasos requeridos: {len(steps)}")
+        print(f"Costo total: {cost}")
     else:
         print("\nNo se encontró una solución válida para escapar")
+
 
 def prolog_mode():
     solver = PrologBridge()
@@ -80,7 +82,7 @@ def prolog_mode():
 
 def a_star_menu():
     print("\n=== Escape Room Solver (Python - A*) ===")
-    print("1. Ejecutar A* desde A hasta D")
+    print("1. Ejecutar A* desde A hasta H")
     print("2. Ejecutar A* desde cualquier nodo")
     print("3. Volver al menú inicial")
     return input("Seleccione una opción: ")
@@ -90,14 +92,14 @@ def a_star_mode():
         choice = a_star_menu()
 
         if choice == '1':
-            path = a_star_escape("A", "D")
-            display_solution(path)
+            path = a_star_escape("A", "H")
+            display_solution(path, cost)
 
         elif choice == '2':
             start = input("Ingrese el nodo de inicio: ").strip().upper()
             goal = input("Ingrese el nodo destino: ").strip().upper()
-            path = a_star_escape(start, goal)
-            display_solution(path)
+            path, cost = a_star_escape(start, goal)
+            display_solution(path, cost)
 
         elif choice == '3':
             print("Volviendo al menú inicial...")

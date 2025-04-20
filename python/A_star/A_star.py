@@ -1,5 +1,5 @@
 import heapq
-from .map import doors, keys_in_rooms, trap_room, trap_limit, inventory_limit, max_moves
+from .map import doors, keys_in_rooms, trap_room, trap_limit, inventory_limit, max_moves, room_costs
 from .heuristic import manhattan_heuristic, has_key
 
 def a_star_escape(start, goal):
@@ -10,7 +10,7 @@ def a_star_escape(start, goal):
         f, g, current, path, inventory, visits = heapq.heappop(open_list)
 
         if current == goal:
-            return path + [current]
+            return path + [current], g
 
         new_path = path + [current]
         new_inventory = inventory.copy()
@@ -38,7 +38,8 @@ def a_star_escape(start, goal):
                 passable = False
 
             if passable:
-                g_new = g + 1
+                move_cost = room_costs.get((current, neighbor), 1) # Default cost is 1
+                g_new = g + move_cost
                 if g_new > max_moves:
                     continue
                 h = manhattan_heuristic(neighbor, goal)
@@ -48,4 +49,4 @@ def a_star_escape(start, goal):
                     (f_new, g_new, neighbor, new_path, new_inventory.copy(), new_visits.copy())
                 )
 
-    return None
+    return None, 0
