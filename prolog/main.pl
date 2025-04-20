@@ -1,4 +1,5 @@
 % main.pl
+:- set_prolog_flag(stack_limit, 8_589_934_592).  % Añadido límite de pila de 8GB
 :- use_module(state).
 :- use_module(facts).
 :- use_module(rules).
