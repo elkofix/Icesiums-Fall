@@ -6,6 +6,7 @@
 :- use_module(constraints).
 :- use_module(search).
 :- use_module(search_no_constraints).
+:- use_module(a_star).
 :- use_module(library(clpfd)).
 
 % Start game function - ask user for game type
@@ -47,6 +48,7 @@ help :-
     writeln("- game_stats. : View game statistics and constraints"),
     writeln("- find_escape_plan. : Find the solution to escape"),
     writeln("- find_escape_plan_no_constraints. : Find the solution ignoring inventory limits"),
+    writeln("- find_escape_plan_a_star. : Find the solution using A* algorithm"),
     writeln("- help. : Show this help"),
     writeln("- start_game. : Start a new game (predefined or custom)"),
     writeln("- create_custom_game. : Create a new custom escape room"),
@@ -229,6 +231,9 @@ find_escape_plan :-
 
 find_escape_plan_no_constraints :-
     search_no_constraints:find_escape_solution_no_constraints.
+
+find_escape_plan_a_star :-
+    a_star:find_escape_solution.
 
 % Entry point
 :- initialization(start_game).
