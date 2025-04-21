@@ -7,6 +7,7 @@
     get_possible_moves/2
 ]).
 
+:- use_module(adversary).
 :- use_module(state).
 :- use_module(facts).
 :- use_module(constraints).
@@ -65,6 +66,14 @@ initialize_game :-
     % Set up doors based on facts
     forall(facts:door(X, Y, State), assertz(state:door_state(X, Y, State))),
     
+    (main:game_mode(adversary) ->
+        adversary:initialize_guard,
+        adversary:guard_location(GuardRoom),
+        format("El guardia comienza en la habitación ~w.~n", [GuardRoom])
+    ;
+        true
+    ),
+
     writeln("Game initialized! You are in room A."),
     writeln("Type 'help.' for available commands."),
     game_stats.

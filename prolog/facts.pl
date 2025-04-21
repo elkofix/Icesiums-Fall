@@ -15,6 +15,7 @@
     load_predefined_game/0,
     create_custom_game/0
 ]).
+:- use_module(adversary).
 
 :- dynamic room/1, door/3, key_in_room/2,
     object_in_room/2, hides_piece/3, piece/2,
@@ -83,16 +84,30 @@ load_predefined_game :-
     clear_game_data,
     
     % Add rooms
-    add_room(a), add_room(b), add_room(c), add_room(d),
+    add_room(a), add_room(b), add_room(c), add_room(d), add_room(e), add_room(f), add_room(g), add_room(h),  add_room(i),  add_room(j),  add_room(k),  add_room(l), 
+
     set_final_room(d),
 
     % Add doors
-    add_door(a, b, locked),
-    add_door(b, a, locked),
-    add_door(b, c, locked),
-    add_door(c, b, locked),
-    add_door(c, d, locked),
-    add_door(d, c, locked),
+    add_door(a, b, unlocked),
+    add_door(b, a, unlocked),
+    add_door(a, e, unlocked),
+    add_door(e, a, unlocked),
+    add_door(e, f, unlocked),
+    add_door(f, g, unlocked),
+    add_door(g, h, unlocked),
+    add_door(h, e, unlocked),
+    add_door(b, c, unlocked),
+    add_door(c, b, unlocked),
+    add_door(c, d, unlocked),
+    add_door(d, c, unlocked),
+    add_door(c, i, unlocked),
+    add_door(i, c, unlocked),
+    add_door(i, j, unlocked),
+    add_door(j, k, unlocked),
+    add_door(k, l, unlocked),
+    add_door(l, i, unlocked),
+
     
     % Add keys
     add_key(a, key1),
@@ -139,6 +154,13 @@ load_predefined_game :-
     set_door_requirements(c, d, [puzzle_solved(puzzle2), has_key(key2)]),
     set_door_requirements(d, c, [puzzle_solved(puzzle2), has_key(key2)]),
     
+    (main:game_mode(adversary) ->
+        adversary:set_initial_guard_location(f),
+        ask_guard_movement_type
+
+    ;
+        true
+    ),
     writeln('Predefined game loaded successfully!').
 
 % Interactive game creation
@@ -147,6 +169,13 @@ create_custom_game :-
     writeln('Creating a custom escape room game.'),
     writeln('Let\'s set up the rooms first.'),
     custom_game_rooms.
+    (main:game_mode(adversary) ->
+        custom_game_guard_location,
+        % Ask about guard movement type
+        ask_guard_movement_type
+    ;
+        true
+    ).
 
 custom_game_rooms :-
     writeln('Enter room names, one at a time (enter "done" when finished):'),
@@ -299,4 +328,35 @@ custom_game_final_room :-
         writeln('Invalid room. Please choose from the available rooms:'),
         format('~w~n', [Rooms]),
         custom_game_final_room
+    ).
+
+custom_game_guard_location :-
+    writeln('Let\'s set the initial guard location.'),
+    findall(R, room(R), Rooms),
+    format('Available rooms: ~w~n', [Rooms]),
+    writeln('Enter the room where the guard should start:'),
+    read(GuardRoom),
+    (room(GuardRoom) ->
+        adversary:set_initial_guard_location(GuardRoom),
+        format('Guard will start in room ~w.~n', [GuardRoom])
+    ;
+        writeln('Invalid room. Please choose from the available rooms:'),
+        format('~w~n', [Rooms]),
+        custom_game_guard_location
+    ).
+
+ask_guard_movement_type :-
+    writeln('How should the guard move?'),
+    writeln('1. Predictive'),
+    writeln('2. Random'),
+    read(Choice),
+    (Choice = 1 ->
+        adversary:set_guard_movement_type(predictive),
+        writeln('Guard will use predictive movement.')
+    ; Choice = 2 ->
+        adversary:set_guard_movement_type(random),
+        writeln('Guard will use random movement.')
+    ;
+        writeln('Invalid choice. Please select 1 or 2:'),
+        ask_guard_movement_type
     ).
