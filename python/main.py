@@ -1,6 +1,6 @@
 import os
 from integration.prolog_Bridge import PrologBridge
-from A_star.A_star import a_star_escape
+from A_star.a_star import a_star_escape
 from A_star.load_map import load_map_from_json
 from A_star import map as game_map
 import tkinter as tk

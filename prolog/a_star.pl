@@ -24,7 +24,7 @@ find_escape_solution :-
     (a_star(InitialState, GoalState, Solution) ->
         statistics(walltime, [End|_]),  % Fin del cronómetro
         Time is End - Start,
-        length(Solution, Steps),  % Calcula la longitud aquí
+        length(Solution, Steps),
 
         format('Solution found! Steps to escape: ~n'),
         print_solution(Solution),
