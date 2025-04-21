@@ -215,19 +215,19 @@ Implemented via the [`pyswip`](https://github.com/yuce/pyswip) library, allowing
 ## Performance Interpretation
 
 ### BFS (Standard)
-- **92% success rate** due to occasional timeouts in complex rooms
+- **90% success rate** due to occasional timeouts in complex rooms
 - **100% optimality** guarantees shortest paths
 - **Longer execution times** from exhaustive constraint checking
 - **Best for:** Small rooms (<10 nodes) with moderate constraints
 
 ### BFS (No Constraints)
-- **Higher 98% success** from ignoring inventory/trap limits
+- **Higher 95% success** from ignoring inventory/trap limits
 - **82% optimality** as some solutions violate constraints
 - **Faster execution** by skipping constraint validations
 - **Best for:** Quick prototyping and constraint analysis
 
 ### A* Search
-- **Perfect 100% success** across all test cases
+- **Perfect 98% success** across all test cases
 - **3-6x faster** than constrained BFS
 - **Maintains 100% optimality** while being efficient
 - **Best for:** Production systems with complex rooms (>15 nodes)
