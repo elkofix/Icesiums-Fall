@@ -63,7 +63,71 @@ class PrologBridge:
             query = """
                 with_output_to(
                     codes(Codes),
-                    find_escape_solution
+                    search:find_escape_solution
+                ),
+                atom_codes(Output, Codes)
+            """
+
+            
+            start_time = time.time()
+            result = list(self.prolog.query(query))
+            exec_time = time.time() - start_time
+            
+            if not result:
+                print(f"Búsqueda terminada (límite: {time_limit}s)")
+                return None
+                
+            solution = self._parse_solution(result[0]['Output'])
+            print(f"Búsqueda completada en {exec_time:.2f}s")
+            return solution
+            
+        except Exception as e:
+            print(f"Error controlado: {str(e)}")
+            return None
+
+    def find_escape_plan_no(self, time_limit=120):
+        """Búsqueda con protección de recursos sin cambiar el código Prolog"""
+        try:
+            # Triple protección de recursos
+            self.prolog.query("garbage_collect")
+            self.prolog.query(f"set_prolog_flag(stack_limit, 8_589_934_592)")
+            
+            query = """
+                with_output_to(
+                    codes(Codes),
+                    search_no_constraints:find_escape_solution_no_constraints
+                ),
+                atom_codes(Output, Codes)
+            """
+
+            
+            start_time = time.time()
+            result = list(self.prolog.query(query))
+            exec_time = time.time() - start_time
+            
+            if not result:
+                print(f"Búsqueda terminada (límite: {time_limit}s)")
+                return None
+                
+            solution = self._parse_solution(result[0]['Output'])
+            print(f"Búsqueda completada en {exec_time:.2f}s")
+            return solution
+            
+        except Exception as e:
+            print(f"Error controlado: {str(e)}")
+            return None
+
+    def find_escape_plan_star(self, time_limit=120):
+        """Búsqueda con protección de recursos sin cambiar el código Prolog"""
+        try:
+            # Triple protección de recursos
+            self.prolog.query("garbage_collect")
+            self.prolog.query(f"set_prolog_flag(stack_limit, 8_589_934_592)")
+            
+            query = """
+                with_output_to(
+                    codes(Codes),
+                    a_star:find_escape_solution
                 ),
                 atom_codes(Output, Codes)
             """

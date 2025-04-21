@@ -216,12 +216,16 @@ class EscapeRoomGUI:
         """Main game screen with all actions"""
         self.clear_outputs()
         self.buttons = [
-            Button(MARGIN, SCREEN_HEIGHT - 2*(BUTTON_HEIGHT + MARGIN), BUTTON_WIDTH, BUTTON_HEIGHT, 
+            Button(MARGIN, SCREEN_HEIGHT - 1*(BUTTON_HEIGHT + MARGIN), BUTTON_WIDTH, BUTTON_HEIGHT, 
                   "Inventory", self.show_inventory),
-            Button(MARGIN, SCREEN_HEIGHT - 4*(BUTTON_HEIGHT + MARGIN), BUTTON_WIDTH, BUTTON_HEIGHT, 
-                  "Find Solution", self.find_solution),
-            Button(MARGIN, SCREEN_HEIGHT - 5*(BUTTON_HEIGHT + MARGIN), BUTTON_WIDTH, BUTTON_HEIGHT, 
-                  "Help", self.toggle_help),
+            Button(MARGIN, SCREEN_HEIGHT - 3*(BUTTON_HEIGHT + MARGIN), BUTTON_WIDTH, BUTTON_HEIGHT, 
+                  "Find Solution BFS", self.find_solution),
+                              Button(MARGIN, SCREEN_HEIGHT - 4*(BUTTON_HEIGHT + MARGIN), BUTTON_WIDTH, BUTTON_HEIGHT, 
+                  "Find Solution BFS no Cons", self.find_solution_no),
+                              Button(MARGIN, SCREEN_HEIGHT - 5*(BUTTON_HEIGHT + MARGIN), BUTTON_WIDTH, BUTTON_HEIGHT, 
+                  "Find Solution A*", self.find_solution_start),
+                                  Button(MARGIN, SCREEN_HEIGHT - 6*(BUTTON_HEIGHT + MARGIN), BUTTON_WIDTH, BUTTON_HEIGHT, 
+                  "Clear", self.clear_outputs),
             Button(SCREEN_WIDTH - BUTTON_WIDTH - MARGIN, SCREEN_HEIGHT - BUTTON_HEIGHT - MARGIN, 
                   BUTTON_WIDTH, BUTTON_HEIGHT, "New Game", self.start_screen)
         ]
@@ -322,18 +326,13 @@ class EscapeRoomGUI:
         self.output_text = []
         self.scroll_position = 0
 
-
-    def add_output(self, text):
-        """Add text to the output display"""
-        # Limpiar si hay 10 líneas ya
-        if len(self.output_text) >= 10:
-            self.clear_outputs()
-
-        # Split long lines to fit screen
+    def add_output(self, text, center=False, indent=0):
+        """Add text to the output display, optionally centered or indented"""
         max_chars = (SCREEN_WIDTH - 2 * MARGIN) // (FONT_SIZE // 2)
+        lines = []
+
         if len(text) > max_chars:
             words = text.split()
-            lines = []
             current_line = []
             current_length = 0
 
@@ -342,19 +341,35 @@ class EscapeRoomGUI:
                     current_line.append(word)
                     current_length += len(word) + 1
                 else:
-                    lines.append(" ".join(current_line))
+                    line = " ".join(current_line)
+                    if center:
+                        line = line.center(max_chars)
+                    elif indent > 0:
+                        line = " " * indent + line
+                    lines.append(line)
                     current_line = [word]
                     current_length = len(word)
 
             if current_line:
-                lines.append(" ".join(current_line))
-
-            self.output_text.extend(lines)
+                line = " ".join(current_line)
+                if center:
+                    line = line.center(max_chars)
+                elif indent > 0:
+                    line = " " * indent + line
+                lines.append(line)
         else:
-            self.output_text.append(text)
+            line = text
+            if center:
+                line = line.center(max_chars)
+            elif indent > 0:
+                line = " " * indent + line
+            lines.append(line)
+
+        self.output_text.extend(lines)
 
         # Auto-scroll to bottom
         self.scroll_position = max(0, len(self.output_text) - (SCREEN_HEIGHT // (FONT_SIZE + 4)) * (FONT_SIZE + 4))
+
 
     def show_inventory(self):
         """Show player inventory"""
@@ -503,14 +518,40 @@ class EscapeRoomGUI:
     
     def find_solution(self):
         """Find escape solution"""
-        self.add_output("\nSearching for escape solution...")
+        self.add_output("\nSearching for escape solution with bfs...")
         solution = self.bridge.find_escape_plan()
         
         if solution:
-            self.add_output("\nSolution found:")
+            self.add_output("\nSolution found:", False, 80)
             for step in solution:
-                self.add_output(f"- {step}")
-            self.add_output(f"Total steps required: {len(solution)}")
+                self.add_output(f"- {step}",False, 80)
+            self.add_output(f"Total steps required: {len(solution)}" , False, 80)
+        else:
+            self.add_output("\nNo escape solution found! The room might be unsolvable.")
+    
+    def find_solution_no(self):
+        """Find escape solution"""
+        self.add_output("\nSearching for escape solution with no constraints...")
+        solution = self.bridge.find_escape_plan_no()
+        
+        if solution:
+            self.add_output("\nSolution found:", False, 80)
+            for step in solution:
+                self.add_output(f"- {step}",False, 80)
+            self.add_output(f"Total steps required: {len(solution)}" , False, 80)
+        else:
+            self.add_output("\nNo escape solution found! The room might be unsolvable.")
+    
+    def find_solution_start(self):
+        """Find escape solution"""
+        self.add_output("\nSearching for escape solution with A*...")
+        solution = self.bridge.find_escape_plan_star()
+        
+        if solution:
+            self.add_output("\nSolution found:", False, 80)
+            for step in solution:
+                self.add_output(f"- {step}",False, 80)
+            self.add_output(f"Total steps required: {len(solution)}" , False, 80)
         else:
             self.add_output("\nNo escape solution found! The room might be unsolvable.")
     
