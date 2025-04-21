@@ -1,3 +1,4 @@
+#prolog
 from pyswip import Prolog
 import os
 from pathlib import Path
@@ -30,11 +31,13 @@ class PrologBridge:
          
             files_to_load = [
                 "facts.pl",
-                "state.pl", 
                 "constraints.pl",
                 "rules.pl",
+                "state.pl", 
                 "search.pl",
-                "main.pl"
+                "a_star.pl",
+                "adversary.pl",
+                "search_no_constraints.pl",
             ]
             
             for file in files_to_load:
