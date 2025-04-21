@@ -73,13 +73,13 @@ move_guard :-
     % Mover el guardia a la nueva habitación
     retractall(guard_location(_)),
     assertz(guard_location(NextRoom)),
-    format("El guardia se mueve de la habitación ~w a la habitación ~w.~n", [CurrentRoom, NextRoom]),
+    format("Guard moved ~w to room ~w.~n", [CurrentRoom, NextRoom]),
     % Verificar si el guardia capturó al jugador
     capture_player,
 
     get_time(End),  % Finaliza cronómetro
     Duration is End - Start,  % Calcula el tiempo en segundos
-    format("Tiempo de ejecución del movimiento del guardia: ~5f segundos~n", [Duration]).
+    format("Guard movement took: ~5f segundos~n", [Duration]).
 
 % No hacer nada si ya capturó al jugador o no estamos en modo adversario
 move_guard.
@@ -101,7 +101,7 @@ find_random_move(CurrentRoom, NextRoom) :-
 capture_player :-
     guard_location(Room),
     state:player_location(Room),
-    format("¡El guardia te ha capturado en la habitación ~w!~n", [Room]),
+    format("¡Guard caught you in room ~w!~n", [Room]),
     reset_after_capture.
 
 % No hacer nada si el guardia no ha capturado al jugador
@@ -116,8 +116,8 @@ reset_after_capture :-
     initial_guard_location(InitialRoom),
     retractall(guard_location(_)),
     assertz(guard_location(InitialRoom)),
-    format("Has sido devuelto a la habitación inicial 'a'.~n"),
-    format("El guardia ha vuelto a su posición inicial en la habitación ~w.~n", [InitialRoom]).
+    format("Game over.~n"),
+    format("Restart the game ~w.~n", [InitialRoom]).
 
 % Encontrar el mejor movimiento para el guardia usando minimax
 find_best_move(CurrentRoom, BestMove) :-

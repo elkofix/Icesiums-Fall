@@ -2,7 +2,8 @@ import pygame
 import sys
 from pygame.locals import *
 import re
-
+import tkinter as tk
+from tkinter import filedialog
 from integration.prolog_Bridge import PrologBridge
 from integration.Rules import Rules
 from integration.Search import Search
@@ -10,6 +11,7 @@ from integration.SearchNoConstraints import SearchNoConstraints
 from integration.State import StateManager
 from integration.Contraints import Constraints
 from integration.Facts import Facts
+import json
 
 # Initialize Pygame
 pygame.init()
@@ -128,75 +130,54 @@ class EscapeRoomGUI:
             self.add_output("Failed to load predefined game.")
     
     def create_custom_game(self):
-        """Create a custom game"""
-        # For simplicity, we'll use a predefined custom configuration
-        # In a full implementation, you'd have UI elements to configure this
-        game_config = {
-            "rooms": ["a", "b", "c", "d", "e"],
-            "doors": [
-                {"from": "a", "to": "b", "state": "unlocked"},
-                {"from": "b", "to": "c", "state": "locked"},
-                {"from": "c", "to": "d", "state": "locked"},
-                {"from": "d", "to": "e", "state": "locked"}
-            ],
-            "keys": [
-                {"room": "a", "key_name": "key1"},
-                {"room": "b", "key_name": "key2"}
-            ],
-            "objects": [
-                {"room": "a", "object_name": "desk"},
-                {"room": "b", "object_name": "cabinet"}
-            ],
-            "puzzles": ["puzzle1", "puzzle2"],
-            "pieces": [
-                {"puzzle": "puzzle1", "piece_name": "piece1"},
-                {"puzzle": "puzzle1", "piece_name": "piece2"},
-                {"puzzle": "puzzle2", "piece_name": "piece3"}
-            ],
-            "visible_pieces": [
-                {"room": "a", "piece": "piece1", "puzzle": "puzzle1"},
-                {"room": "b", "piece": "piece2", "puzzle": "puzzle1"}
-            ],
-            "hidden_pieces": [
-                {"object": "desk", "puzzle": "puzzle1", "piece": "piece3"}
-            ],
-            "puzzle_rooms": [
-                {"puzzle": "puzzle1", "room": "c"},
-                {"puzzle": "puzzle2", "room": "d"}
-            ],
-            "door_requirements": [
-                {"from": "b", "to": "c", "requirements": "[has(puzzle1)]"},
-                {"from": "c", "to": "d", "requirements": "[has(key1)]"},
-                {"from": "d", "to": "e", "requirements": "[has(puzzle2)]"}
-            ],
-            "final_room": "e",
-            "game_mode": self.mode
-        }
-        
-        if self.mode == "adversary":
-            game_config["guard_location"] = "b"
-            game_config["guard_movement_type"] = "predictive"
-        
-        if self.facts.create_custom_game(game_config):
-            self.constraints = Constraints(self.bridge)
-            self.constraints.create_custom_constraints(
-                max_moves=50,
-                max_b_visits=3,
-                key_limit=2,
-                piece_limit=5,
-                traps=[("b", 3)] if self.mode == "adversary" else None
-            )
-            self.rules = Rules(self.bridge)
-            if self.rules.initialize_game():
-                self.game_initialized = True
-                self.update_game_state()
-                self.add_output("Custom game created successfully!")
-                self.main_game_screen()
+        """Open a file dialog to load a custom game config JSON (for Pygame)"""
+        # Usamos Tkinter solo para el diálogo de archivos (no se muestra ventana)
+        root = tk.Tk()
+        root.withdraw()
+
+        self.add_output("Abriendo selector de archivo JSON...")
+
+        file_path = filedialog.askopenfilename(
+            title="Seleccionar configuración del juego",
+            filetypes=[("Archivos JSON", "*.json")]
+        )
+
+        if not file_path:
+            self.add_output("Carga cancelada por el usuario.")
+            return
+
+        try:
+            with open(file_path, 'r') as f:
+                game_config = json.load(f)
+
+            # Asegurar que el modo esté presente
+            game_config["game_mode"] = self.mode
+
+            if self.mode == "adversary":
+                game_config.setdefault("guard_location", "b")
+                game_config.setdefault("guard_movement_type", "predictive")
+
+            if self.facts.create_custom_game(game_config):
+                self.constraints = Constraints(self.bridge)
+                self.constraints.create_custom_constraints(
+                    max_moves=50,
+                    max_b_visits=3,
+                    key_limit=2,
+                    piece_limit=5,
+                    traps=[("b", 3)] if self.mode == "adversary" else None
+                )
+                self.rules = Rules(self.bridge)
+                if self.rules.initialize_game():
+                    self.game_initialized = True
+                    self.update_game_state()
+                    self.add_output("Juego personalizado cargado exitosamente.")
+                    self.main_game_screen()
+                else:
+                    self.add_output("Error al inicializar las reglas del juego.")
             else:
-                self.add_output("Failed to initialize game rules.")
-        else:
-            self.add_output("Failed to create custom game.")
-    
+                self.add_output("Error al crear el juego personalizado.")
+        except Exception as e:
+            self.add_output(f"Error al cargar el archivo JSON: {e}")
     def set_guard_movement(self, option):
         self.facts.set_guard_movement_type(option)
         self.initialize_game()

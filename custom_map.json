@@ -1,38 +1,41 @@
 {
-  "doors": {
-    "A": { "B": "unlocked" },
-    "B": { "C": "locked(key1)" },
-    "C": { "D": "unlocked" },
-    "D": { "E": "unlocked" },
-    "E": { "F": "unlocked" },
-    "F": { "G": "unlocked" },
-    "G": { "H": "locked(key2)" }
-  },
-  "keys_in_rooms": {
-    "A": ["key1"],
-    "F": ["key2"]
-  },
-  "room_coords": {
-    "A": [0, 0],
-    "B": [1, 0],
-    "C": [2, 0],
-    "D": [3, 0],
-    "E": [4, 0],
-    "F": [5, 0],
-    "G": [6, 0],
-    "H": [7, 0]
-  },
-  "trap_room": "C",
-  "trap_limit": 1,
-  "inventory_limit": 3,
-  "max_moves": 50,
-  "room_costs": {
-    "(A, B)": 1,
-    "(B, C)": 2,
-    "(C, D)": 2,
-    "(D, E)": 1,
-    "(E, F)": 3,
-    "(F, G)": 1,
-    "(G, H)": 1
-  }
+  "rooms": ["a", "b", "c", "d", "e"],
+  "doors": [
+      {"from": "a", "to": "b", "state": "unlocked"},
+      {"from": "b", "to": "c", "state": "locked"},
+      {"from": "c", "to": "d", "state": "locked"},
+      {"from": "d", "to": "e", "state": "locked"}
+  ],
+  "keys": [
+      {"room": "a", "key_name": "key1"},
+      {"room": "b", "key_name": "key2"}
+  ],
+  "objects": [
+      {"room": "a", "object_name": "desk"},
+      {"room": "b", "object_name": "cabinet"}
+  ],
+  "puzzles": ["puzzle1", "puzzle2"],
+  "pieces": [
+      {"puzzle": "puzzle1", "piece_name": "piece1"},
+      {"puzzle": "puzzle1", "piece_name": "piece2"},
+      {"puzzle": "puzzle2", "piece_name": "piece3"}
+  ],
+  "visible_pieces": [
+      {"room": "a", "piece": "piece1", "puzzle": "puzzle1"},
+      {"room": "b", "piece": "piece2", "puzzle": "puzzle1"}
+  ],
+  "hidden_pieces": [
+      {"object": "desk", "puzzle": "puzzle1", "piece": "piece3"}
+  ],
+  "puzzle_rooms": [
+      {"puzzle": "puzzle1", "room": "c"},
+      {"puzzle": "puzzle2", "room": "d"}
+  ],
+  "door_requirements": [
+      {"from": "b", "to": "c", "requirements": "[has(puzzle1)]"},
+      {"from": "c", "to": "d", "requirements": "[has(key1)]"},
+      {"from": "d", "to": "e", "requirements": "[has(puzzle2)]"}
+  ],
+  "final_room": "e",
+  "game_mode": "adversary"
 }
