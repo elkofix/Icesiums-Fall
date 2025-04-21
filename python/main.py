@@ -462,7 +462,20 @@ class EscapeRoomGUI:
             
             # In adversary mode, move the guard
             if self.mode == "adversary":
-                self.bridge.prolog.query("adversary:move_guard")
+                query = """
+                    with_output_to(
+                        codes(Codes),
+                        adversary:move_guard
+                    ),
+                    atom_codes(Output, Codes)
+                    """
+                result = list(self.bridge.prolog.query(query))
+                if result:
+                    output = result[0]["Output"]
+                    self.add_output(f"\n{output}")
+                else:
+                    self.add_output("\nNo guard movement output.")
+                
             
             self.add_output(f"\nMoved to room {new_room}.")
         else:
