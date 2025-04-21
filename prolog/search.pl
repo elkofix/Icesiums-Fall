@@ -8,8 +8,9 @@
 
 % Main function to find escape solution
 find_escape_solution :-
+    get_time(Start),  % Inicia cronómetro
+
     writeln('Searching for escape solution...'),
-    statistics(walltime, [Start|_]), 
     % Get the starting room and final room
     state:player_location(StartRoom),
     facts:final_room(FinalRoom),
@@ -21,17 +22,20 @@ find_escape_solution :-
     
     % Run BFS to find a solution
     (bfs(InitialState, GoalState, Solution) ->
-        statistics(walltime, [End|_]),  
-        Time is End - Start,
+        get_time(End),  % Finaliza cronómetro
+        Time is End - Start,  % Calcula el tiempo en segundos
         length(Solution, Steps),  
 
         format('Solution found! Steps to escape: ~n'),
         print_solution(Solution),
-        format('Solution found in ~3f seconds! ~n', [Time]),
+        format('Solution found in ~5f seconds! ~n', [Time]),
         format('Total steps required: ~w~n', [Steps])  
 
     ;
-        writeln('No escape solution found! The room might be unsolvable.')
+        writeln('No escape solution found! The room might be unsolvable.'),
+        get_time(End),  % Finaliza cronómetro incluso si no hay solución
+        Time is End - Start,  % Calcula el tiempo en segundos
+        format('Execution time: ~3f seconds~n', [Time])
     ).
 
 % BFS implementation to find a path from InitialState to the final room

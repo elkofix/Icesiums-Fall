@@ -53,6 +53,8 @@ initialize_guard :-
 
 % Mover el guardia según el tipo de movimiento configurado
 move_guard :-
+    get_time(Start),  % Inicia cronómetro
+
     % Solo mover si el juego está en el modo adversario
     main:game_mode(adversary),
     guard_location(CurrentRoom),
@@ -73,10 +75,15 @@ move_guard :-
     assertz(guard_location(NextRoom)),
     format("El guardia se mueve de la habitación ~w a la habitación ~w.~n", [CurrentRoom, NextRoom]),
     % Verificar si el guardia capturó al jugador
-    capture_player.
+    capture_player,
+
+    get_time(End),  % Finaliza cronómetro
+    Duration is End - Start,  % Calcula el tiempo en segundos
+    format("Tiempo de ejecución del movimiento del guardia: ~5f segundos~n", [Duration]).
 
 % No hacer nada si ya capturó al jugador o no estamos en modo adversario
 move_guard.
+
 
 % Buscar un movimiento aleatorio para el guardia
 find_random_move(CurrentRoom, NextRoom) :-

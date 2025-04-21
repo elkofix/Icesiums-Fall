@@ -8,9 +8,9 @@
 
 % Funcion principal para encontrar solución de escape sin restricciones
 find_escape_solution_no_constraints :-
-    writeln('Buscando solución de escape sin restricciones de inventario...'),
-    statistics(walltime, [Start|_]),  % Inicio del cronómetro
+    get_time(Start),  % Inicio del cronómetro
 
+    writeln('Buscando solución de escape sin restricciones de inventario...'),
     % Obtener la habitación inicial y final
     state:player_location(StartRoom),
     facts:final_room(FinalRoom),
@@ -22,17 +22,19 @@ find_escape_solution_no_constraints :-
     
     % Ejecutar BFS para encontrar una solución
     (bfs(InitialState, GoalState, Solution) ->
-        statistics(walltime, [End|_]), 
-        Time is End - Start,
+        get_time(End),  % Finaliza cronómetro
+        Time is End - Start,  % Calcula el tiempo en segundos
         length(Solution, Steps),  
 
         format('¡Solución encontrada! Pasos para escapar: ~n'),
         print_solution(Solution),
-        format('Solution found in ~3f seconds! ~n', [Time]),
-
+        format('Solution found in ~5f seconds! ~n', [Time]),
         format('Total de pasos requeridos: ~w~n', [Steps]) 
     ;
-        writeln('¡No se encontró solución de escape! La habitación podría ser irresoluble.')
+        writeln('¡No se encontró solución de escape! La habitación podría ser irresoluble.'),
+        get_time(End),  % Finaliza cronómetro incluso si no hay solución
+        Time is End - Start,  % Calcula el tiempo en segundos
+        format('Execution time: ~3f seconds~n', [Time])
     ).
 
 % Implementación BFS para encontrar un camino desde el estado inicial hasta la habitación final
