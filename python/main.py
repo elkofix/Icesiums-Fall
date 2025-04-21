@@ -1,183 +1,640 @@
-import os
+import pygame
+import sys
+from pygame.locals import *
+import re
+
 from integration.prolog_Bridge import PrologBridge
-from A_star.a_star import a_star_escape
-from A_star.load_map import load_map_from_json
-from A_star import map as game_map
-import tkinter as tk
-from tkinter import filedialog
+from integration.Rules import Rules
+from integration.Search import Search
+from integration.SearchNoConstraints import SearchNoConstraints
+from integration.State import StateManager
+from integration.Contraints import Constraints
+from integration.Facts import Facts
 
-default_map = {
-    "doors": game_map.doors,
-    "keys_in_rooms": game_map.keys_in_rooms,
-    "room_coords": game_map.room_coords,
-    "trap_room": game_map.trap_room,
-    "trap_limit": game_map.trap_limit,
-    "inventory_limit": game_map.inventory_limit,
-    "max_moves": game_map.max_moves,
-    "room_costs": game_map.room_costs,
-}
+# Initialize Pygame
+pygame.init()
 
-def display_main_menu():
-    print("\n===== Menú Inicial =====")
-    print("1. BFS (Prolog)")
-    print("2. A* (Python)")
-    print("0. Salir")
-    return input("Seleccione una opción: ")
+# Constants
+SCREEN_WIDTH = 1024
+SCREEN_HEIGHT = 650
+BUTTON_WIDTH = 200
+BUTTON_HEIGHT = 40
+MARGIN = 20
+FONT_SIZE = 24
+SCROLL_SPEED = 20
 
-# ================== PROLOG MENU ==================
-
-def display_prolog_menu():
-    print("\n=== Escape Room Solver (Prolog - BFS) ===")
-    print("1. Cargar juego predefinido")
-    print("2. Crear juego personalizado")
-    print("3. Buscar solución de escape")
-    print("4. Mostrar estado actual")
-    print("0. Volver al menú inicial")
-    return input("Seleccione una opción: ")
-
-def display_solution(steps, cost=0):
-    if steps:
-        print("\n=== Plan de Escape ===")
-        for i, step in enumerate(steps, 1):
-            print(f"{i}. {step}")
-        print(f"\nTotal de pasos requeridos: {len(steps)}")
-        print(f"Costo total: {cost}")
-    else:
-        print("\nNo se encontró una solución válida para escapar")
+# Colors
+WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
+GRAY = (200, 200, 200)
+LIGHT_GRAY = (230, 230, 230)
+DARK_GRAY = (100, 100, 100)
+RED = (255, 0, 0)
+GREEN = (0, 255, 0)
+BLUE = (0, 0, 255)
+YELLOW = (255, 255, 0)
+PURPLE = (128, 0, 128)
 
 
-def prolog_mode():
-    solver = PrologBridge()
-    current_state = None
 
-    while True:
-        choice = display_prolog_menu()
-
-        if choice == '1':
-            if solver.initialize_game(1):
-                current_state = solver.get_current_state()
-                print("\nJuego predefinido cargado correctamente!")
-                print(f"Ubicación actual: {current_state['room']}")
+class EscapeRoomGUI:
+    def __init__(self, bridge):
+        self.bridge = bridge
+        self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+        pygame.display.set_caption("Dynamic Escape Room Game")
+        
+        self.font = pygame.font.SysFont('Arial', FONT_SIZE)
+        self.small_font = pygame.font.SysFont('Arial', FONT_SIZE - 4)
+        
+        # Game state
+        self.current_room = None
+        self.inventory = []
+        self.solved_puzzles = []
+        self.doors = []
+        self.objects = []
+        self.keys = []
+        self.pieces = []
+        self.available_actions = []
+        
+        # UI state
+        self.output_text = []
+        self.scroll_position = 0
+        self.mode = "standard"  # or "adversary"
+        self.game_initialized = False
+        self.show_help = False
+        
+        # Initialize game
+        self.start_screen()
+    
+    def start_screen(self):
+        """Show the initial game start screen"""
+        self.output_text = ["Welcome to the Dynamic Escape Room Game!"]
+        self.add_output("Choose game mode:")
+        
+        # Create buttons for game mode selection
+        self.buttons = [
+            Button(SCREEN_WIDTH//2 - BUTTON_WIDTH//2, 200, BUTTON_WIDTH, BUTTON_HEIGHT, 
+                  "Standard Mode", self.start_standard_game),
+            Button(SCREEN_WIDTH//2 - BUTTON_WIDTH//2, 260, BUTTON_WIDTH, BUTTON_HEIGHT, 
+                  "Adversary Mode", self.start_adversary_game),
+            Button(SCREEN_WIDTH//2 - BUTTON_WIDTH//2, 400, BUTTON_WIDTH, BUTTON_HEIGHT, 
+                  "Help", self.toggle_help)
+        ]
+    
+    def toggle_help(self):
+        """Toggle help display"""
+        self.show_help = not self.show_help
+    
+    def start_standard_game(self):
+        """Start game in standard mode"""
+        self.mode = "standard"
+        self.facts = Facts(self.bridge)
+        self.facts.set_game_mode("standard")
+        self.initialize_game()
+    
+    def start_adversary_game(self):
+        """Start game in adversary mode"""
+        self.mode = "adversary"
+        self.facts = Facts(self.bridge)
+        self.facts.set_game_mode("adversary")
+        self.movement_mode_screen()
+            
+    def initialize_game(self):
+        """Initialize the game"""
+        self.add_output("\nChoose game type:")
+        self.buttons = [
+            Button(SCREEN_WIDTH//2 - BUTTON_WIDTH - MARGIN, 200, BUTTON_WIDTH, BUTTON_HEIGHT, 
+                  "Predefined Game", self.load_predefined_game),
+            Button(SCREEN_WIDTH//2 + MARGIN, 200, BUTTON_WIDTH, BUTTON_HEIGHT, 
+                  "Custom Game", self.create_custom_game),
+            Button(SCREEN_WIDTH//2 - BUTTON_WIDTH//2, 300, BUTTON_WIDTH, BUTTON_HEIGHT, 
+                  "Back", self.start_screen)
+        ]
+    
+    def load_predefined_game(self):
+        """Load the predefined game"""
+        if self.facts.load_predefined_game():
+            self.constraints = Constraints(self.bridge)
+            self.constraints.load_default_constraints()
+            self.rules = Rules(self.bridge)
+            if self.rules.initialize_game():
+                self.game_initialized = True
+                self.update_game_state()
+                self.add_output("Predefined game loaded successfully!")
+                self.main_game_screen()
             else:
-                print("Error al cargar el juego predefinido")
-
-        elif choice == '2':
-            if solver.initialize_game(2):
-                current_state = solver.get_current_state()
-                print("\nJuego personalizado creado correctamente!")
-                print(f"Ubicación actual: {current_state['room']}")
-            else:
-                print("Error al crear el juego personalizado")
-
-        elif choice == '3':
-            if not current_state:
-                print("Primero debe cargar o crear un juego!")
-                continue
-
-            print("\nBuscando solución óptima (BFS - Prolog)...")
-            solution = solver.find_escape_plan()
-            display_solution(solution)
-
-        elif choice == '4':
-            if current_state:
-                print("\n=== Estado Actual ===")
-                print(f"Habitación: {current_state['room']}")
-                print(f"Inventario: {current_state['inventory']}")
-                print(f"Puzzles resueltos: {current_state['solved_puzzles']}")
-            else:
-                print("Primero debe cargar o crear un juego!")
-
-        elif choice == '0':
-            print("Volviendo al menú inicial...")
-            break
-
+                self.add_output("Failed to initialize game rules.")
         else:
-            print("Opción no válida. Intente nuevamente.")
-
-# ================== A* MENU ==================
-
-def a_star_menu():
-    print("\n=== Escape Room Solver (Python - A*) ===")
-    print("1. Ejecutar A* desde A hasta H")
-    print("2. Ejecutar A* desde cualquier nodo")
-    print("3. Cargar mapa personalizado")
-    print("0. Volver al menú inicial")
-    return input("Seleccione una opción: ")
-
-def a_star_mode():
-    while True:
-        choice = a_star_menu()
-
-        if choice == '1':
-            path, cost = a_star_escape("A", "H", default_map)
-            display_solution(path, cost)
-
-        elif choice == '2':
-            start = input("Ingrese el nodo de inicio: ").strip().upper()
-            goal = input("Ingrese el nodo destino: ").strip().upper()
-            path, cost = a_star_escape(start, goal, default_map)
-            display_solution(path, cost)
-        elif choice == '3':
-            print("Seleccione el archivo JSON del mapa...")
-            root = tk.Tk()
-            root.withdraw()  # Oculta la ventana principal
-
-            file_path = filedialog.askopenfilename(
-                title="Seleccionar archivo de mapa",
-                filetypes=[("Archivos JSON", "*.json")]
+            self.add_output("Failed to load predefined game.")
+    
+    def create_custom_game(self):
+        """Create a custom game"""
+        # For simplicity, we'll use a predefined custom configuration
+        # In a full implementation, you'd have UI elements to configure this
+        game_config = {
+            "rooms": ["a", "b", "c", "d", "e"],
+            "doors": [
+                {"from": "a", "to": "b", "state": "unlocked"},
+                {"from": "b", "to": "c", "state": "locked"},
+                {"from": "c", "to": "d", "state": "locked"},
+                {"from": "d", "to": "e", "state": "locked"}
+            ],
+            "keys": [
+                {"room": "a", "key_name": "key1"},
+                {"room": "b", "key_name": "key2"}
+            ],
+            "objects": [
+                {"room": "a", "object_name": "desk"},
+                {"room": "b", "object_name": "cabinet"}
+            ],
+            "puzzles": ["puzzle1", "puzzle2"],
+            "pieces": [
+                {"puzzle": "puzzle1", "piece_name": "piece1"},
+                {"puzzle": "puzzle1", "piece_name": "piece2"},
+                {"puzzle": "puzzle2", "piece_name": "piece3"}
+            ],
+            "visible_pieces": [
+                {"room": "a", "piece": "piece1", "puzzle": "puzzle1"},
+                {"room": "b", "piece": "piece2", "puzzle": "puzzle1"}
+            ],
+            "hidden_pieces": [
+                {"object": "desk", "puzzle": "puzzle1", "piece": "piece3"}
+            ],
+            "puzzle_rooms": [
+                {"puzzle": "puzzle1", "room": "c"},
+                {"puzzle": "puzzle2", "room": "d"}
+            ],
+            "door_requirements": [
+                {"from": "b", "to": "c", "requirements": "[has(puzzle1)]"},
+                {"from": "c", "to": "d", "requirements": "[has(key1)]"},
+                {"from": "d", "to": "e", "requirements": "[has(puzzle2)]"}
+            ],
+            "final_room": "e",
+            "game_mode": self.mode
+        }
+        
+        if self.mode == "adversary":
+            game_config["guard_location"] = "b"
+            game_config["guard_movement_type"] = "predictive"
+        
+        if self.facts.create_custom_game(game_config):
+            self.constraints = Constraints(self.bridge)
+            self.constraints.create_custom_constraints(
+                max_moves=50,
+                max_b_visits=3,
+                key_limit=2,
+                piece_limit=5,
+                traps=[("b", 3)] if self.mode == "adversary" else None
             )
-
-            if not file_path:
-                print("No se seleccionó ningún archivo.")
-                continue
-
-            try:
-                custom_map = load_map_from_json(file_path)
-
-                # Reemplazar valores en el módulo map
-                game_map.doors = custom_map["doors"]
-                game_map.keys_in_rooms = custom_map["keys_in_rooms"]
-                game_map.room_coords = custom_map["room_coords"]
-                game_map.trap_room = custom_map["trap_room"]
-                game_map.trap_limit = custom_map["trap_limit"]
-                game_map.inventory_limit = custom_map["inventory_limit"]
-                game_map.max_moves = custom_map["max_moves"]
-                game_map.room_costs = custom_map["room_costs"]
-
-                print("Mapa cargado correctamente.")
-                start = input("Ingrese el nodo de inicio: ").strip().upper()
-                goal = input("Ingrese el nodo destino: ").strip().upper()
-                path, cost = a_star_escape(start, goal, custom_map)
-                display_solution(path, cost)
-
-            except Exception as e:
-                print(f" Error cargando el archivo: {e}")
-
-        elif choice == '0':
-            print("Volviendo al menú inicial...")
-            break
-
+            self.rules = Rules(self.bridge)
+            if self.rules.initialize_game():
+                self.game_initialized = True
+                self.update_game_state()
+                self.add_output("Custom game created successfully!")
+                self.main_game_screen()
+            else:
+                self.add_output("Failed to initialize game rules.")
         else:
-            print("Opción no válida. Intente nuevamente.")
+            self.add_output("Failed to create custom game.")
+    
+    def set_guard_movement(self, option):
+        self.facts.set_guard_movement_type(option)
+        self.initialize_game()
 
-# ================== MAIN ==================
+    def movement_mode_screen(self):
+        """Guard movement screen"""
+        self.add_output("How should the guard move?")
+        self.buttons = [
+            Button(SCREEN_WIDTH//2 - BUTTON_WIDTH//2, 200, BUTTON_WIDTH, BUTTON_HEIGHT, 
+                  "Predictive", lambda: self.set_guard_movement(1)),
+            Button(SCREEN_WIDTH//2 - BUTTON_WIDTH//2, 260, BUTTON_WIDTH, BUTTON_HEIGHT, 
+                  "Random", lambda: self.set_guard_movement(2)),
+        ]
 
-def main():
-    while True:
-        choice = display_main_menu()
 
-        if choice == '1':
-            prolog_mode()
+    def main_game_screen(self):
+        """Main game screen with all actions"""
+        self.clear_outputs()
+        self.buttons = [
+            Button(MARGIN, SCREEN_HEIGHT - 2*(BUTTON_HEIGHT + MARGIN), BUTTON_WIDTH, BUTTON_HEIGHT, 
+                  "Inventory", self.show_inventory),
+            Button(MARGIN, SCREEN_HEIGHT - 4*(BUTTON_HEIGHT + MARGIN), BUTTON_WIDTH, BUTTON_HEIGHT, 
+                  "Find Solution", self.find_solution),
+            Button(MARGIN, SCREEN_HEIGHT - 5*(BUTTON_HEIGHT + MARGIN), BUTTON_WIDTH, BUTTON_HEIGHT, 
+                  "Help", self.toggle_help),
+            Button(SCREEN_WIDTH - BUTTON_WIDTH - MARGIN, SCREEN_HEIGHT - BUTTON_HEIGHT - MARGIN, 
+                  BUTTON_WIDTH, BUTTON_HEIGHT, "New Game", self.start_screen)
+        ]
+        
+        # Add room-specific buttons
+        self.update_action_buttons()
 
-        elif choice == '2':
-            a_star_mode()
+    
+    def update_action_buttons(self):
+        """Update buttons for current room actions"""
+        # Remove old action buttons (keep the first 6 buttons)
+        if len(self.buttons) > 6:
+            self.buttons = self.buttons[:6]
+        
+        # Get available actions from state manager
+        self.state = StateManager(self.bridge)
+        self.available_actions = self.state.get_available_actions()
+        print("actions", self.available_actions)
+        # Add action buttons
+        y_pos = MARGIN
+        for action in self.available_actions:
+            action_type, action_target = action.split(":")
+            btn_text = f"{action_type.replace('_', ' ').title()}: {action_target}"
+            
+            # Shorten long button text
+            if len(btn_text) > 20:
+                btn_text = f"{action_type.replace('_', ' ').title()}"
+            
+            self.buttons.append(
+                Button(SCREEN_WIDTH - BUTTON_WIDTH - MARGIN, y_pos, BUTTON_WIDTH, BUTTON_HEIGHT, 
+                      btn_text, lambda a=action: self.handle_action(a))
+            )
+            y_pos += BUTTON_HEIGHT + MARGIN
+    
+    def handle_action(self, action_str):
+        """Handle a game action"""
+        action_type, action_target = action_str.split(":")
+        
+        if action_type == "move_to":
+            self.move_player(action_target)
+        elif action_type == "pick_key":
+            self.pick_key(action_target)
+        elif action_type == "pick_piece":
+            self.pick_piece(action_target)
+        elif action_type == "move_object":
+            self.move_object(action_target)
+        elif action_type == "solve_puzzle":
+            self.solve_puzzle(action_target)
+        elif action_type == "unlock_door":
+            # For unlock, we need from_room and to_room
+            current_room = self.state.player_location()
+            self.unlock_door(current_room, action_target)
+        
+        # Update game state after action
+        self.update_game_state()
+    
+    def update_game_state(self):
+        """Update the current game state"""
+        self.state = StateManager(self.bridge)
+        state = self.state.get_current_state()
+        
+        if state:
+            self.current_room = state['room']
+            self.inventory = state['inventory']
+            self.solved_puzzles = state['solved_puzzles']
+            self.doors = state['doors']
+            
+            print(self.facts.get_objects())
+            # Get objects in current room
+            self.objects = [obj['Object'] for obj in 
+                            self.facts.get_objects() if obj['Room'] == self.current_room]
 
-        elif choice == '0':
-            print("Saliendo del programa...")
-            break
+            # Get keys in current room (both original and dropped)
+            original_keys = [key['Key'] for key in 
+                           self.facts.get_keys() if key['Room'] == self.current_room]
+            dropped_keys = [key['Key'] for key in state['dropped_keys'] 
+                          if key['R'] == self.current_room]
+            self.keys = list(set(original_keys + dropped_keys))
+            
+            # Get pieces in current room (both original and dropped)
+            original_pieces = [(piece['Piece'], piece['Puzzle']) for piece in 
+                             self.facts.get_piece_locations() if piece['Room'] == self.current_room]
+            dropped_pieces = [(piece['Piece'], piece['Puzzle']) for piece in 
+                            state['dropped_pieces'] if piece['R'] == self.current_room]
+            self.pieces = list(set(original_pieces + dropped_pieces))
+        
+        # Check win condition
+        if self.state.check_win_condition():
+            self.add_output("\nCONGRATULATIONS! You've escaped the room!")
+            self.add_output("Game Over - You Win!")
+            self.game_initialized = False
+        
+        # Update action buttons
+        self.update_action_buttons()
+    
+    def clear_outputs(self):
+        """Clear all text from the output display"""
+        self.output_text = []
+        self.scroll_position = 0
 
+
+    def add_output(self, text):
+        """Add text to the output display"""
+        # Limpiar si hay 10 líneas ya
+        if len(self.output_text) >= 10:
+            self.clear_outputs()
+
+        # Split long lines to fit screen
+        max_chars = (SCREEN_WIDTH - 2 * MARGIN) // (FONT_SIZE // 2)
+        if len(text) > max_chars:
+            words = text.split()
+            lines = []
+            current_line = []
+            current_length = 0
+
+            for word in words:
+                if current_length + len(word) + 1 <= max_chars:
+                    current_line.append(word)
+                    current_length += len(word) + 1
+                else:
+                    lines.append(" ".join(current_line))
+                    current_line = [word]
+                    current_length = len(word)
+
+            if current_line:
+                lines.append(" ".join(current_line))
+
+            self.output_text.extend(lines)
         else:
-            print("Opción no válida. Intente nuevamente.")
+            self.output_text.append(text)
 
+        # Auto-scroll to bottom
+        self.scroll_position = max(0, len(self.output_text) - (SCREEN_HEIGHT // (FONT_SIZE + 4)) * (FONT_SIZE + 4))
+
+    def show_inventory(self):
+        """Show player inventory"""
+        self.add_output("\nYour inventory:")
+        if not self.inventory:
+            self.add_output("  Empty")
+        else:
+            for item in self.inventory:
+                self.add_output(f"- {item}")
+        
+        # Show key count
+        key_limit = self.constraints.can_carry('key')
+        key_count = self.constraints.count_items_of_type('key')
+        self.add_output(f"\nKeys: {key_count}/{key_limit}")
+        
+        # Show puzzle pieces
+        self.add_output("\nCollected puzzle pieces:")
+        puzzles = self.facts.get_puzzles()
+        if not puzzles:
+            self.add_output("  None")
+        else:
+            for puzzle in puzzles:
+                puzzle = puzzle['Puzzle']
+                pieces = list(self.bridge.prolog.query(f"state:has_piece({puzzle}, Piece)"))
+                piece_names = [p['Piece'] for p in pieces]
+                self.add_output(f"Puzzle {puzzle}: {piece_names}")
+        
+        # Show piece count
+        piece_limit = self.constraints.can_carry('piece')
+        piece_count = self.constraints.count_items_of_type('piece')
+        self.add_output(f"\nPuzzle pieces: {piece_count}/{piece_limit}")
+        
+        # Show solved puzzles
+        self.add_output("\nSolved puzzles:")
+        if not self.solved_puzzles:
+            self.add_output("  None")
+        else:
+            for puzzle in self.solved_puzzles:
+                self.add_output(f"- {puzzle}")
+    
+    def show_game_stats(self):
+        """Show game statistics"""
+        self.add_output("\nGame Statistics:")
+        
+        # Constraints
+        max_moves = self.constraints.max_moves()
+        moves_used = self.constraints.move_count()
+        remaining_moves = max_moves - moves_used
+        self.add_output(f"Moves: {moves_used}/{max_moves} ({remaining_moves} remaining)")
+        
+        max_b_visits = self.constraints.max_b_visits()
+        if max_b_visits:
+            b_visits = list(self.bridge.prolog.query("constraints:b_visits(X)"))
+            b_visits = b_visits[0]['X'] if b_visits else 0
+            remaining_b_visits = max_b_visits - b_visits
+            self.add_output(f"Room B visits: {b_visits}/{max_b_visits} ({remaining_b_visits} remaining)")
+        
+        # Inventory limits
+        key_limit = self.constraints.can_carry('key')
+        piece_limit = self.constraints.can_carry('piece')
+        self.add_output(f"\nInventory Limits:")
+        self.add_output(f"- Keys: {key_limit}")
+        self.add_output(f"- Puzzle pieces: {piece_limit}")
+        
+        # Room traps
+        traps = list(self.bridge.prolog.query("constraints:trap(Room, Turns)"))
+        if traps:
+            self.add_output("\nRoom Traps:")
+            for trap in traps:
+                room = trap['Room']
+                turns = trap['Turns']
+                current_turns = self.constraints.turns_in_room(room)
+                remaining = turns - current_turns
+                self.add_output(f"- Room {room}: activates after {turns} turns ({remaining} remaining)")
+    
+    def move_player(self, new_room):
+        """Move player to a new room"""
+        if self.state.move_player(new_room):            
+            # Check if new room has trap
+            if not self.constraints.check_trap(new_room):
+                self.add_output(f"\nTRAP ACTIVATED in room {new_room}! Game Over!")
+                self.game_initialized = False
+                return
+            
+            # Check move limit
+            if not self.constraints.check_move_limit():
+                self.add_output("\nMOVE LIMIT REACHED! Game Over!")
+                self.game_initialized = False
+                return
+            
+            # In adversary mode, move the guard
+            if self.mode == "adversary":
+                self.bridge.prolog.query("adversary:move_guard")
+            
+            self.add_output(f"\nMoved to room {new_room}.")
+        else:
+            self.add_output(f"\nCannot move to room {new_room}.")
+    
+    def pick_key(self, key):
+        """Pick up a key"""
+        if self.constraints.check_inventory_limit('key'):
+            if self.state.pick_key(key):
+                self.add_output(f"\nPicked up key: {key}")
+            else:
+                self.add_output(f"\nCannot pick up key: {key}")
+        else:
+            self.add_output(f"\nCannot carry more keys (limit: {self.constraints.can_carry('key')})")
+    
+    def pick_piece(self, piece):
+        """Pick up a puzzle piece"""
+        if self.constraints.check_inventory_limit('piece'):
+            if self.state.pick_piece(piece):
+                self.add_output(f"\nPicked up puzzle piece: {piece}")
+            else:
+                self.add_output(f"\nCannot pick up piece: {piece}")
+        else:
+            self.add_output(f"\nCannot carry more puzzle pieces (limit: {self.constraints.can_carry('piece')})")
+    
+    def move_object(self, obj):
+        """Examine/move an object"""
+        if self.state.move_object(obj):
+            self.add_output(f"\nExamined object: {obj}")
+            # Check if object hides a puzzle piece
+            hidden_piece = list(self.bridge.prolog.query(f"facts:hide_piece({obj}, Puzzle, Piece)"))
+            print("hidden", hidden_piece)
+            if hidden_piece:
+                piece = hidden_piece[0]['Piece']
+                puzzle = hidden_piece[0]['Puzzle']
+                self.add_output(f"Found hidden puzzle piece: {piece} (of puzzle {puzzle})")
+        else:
+            self.add_output(f"\nCannot examine object: {obj}")
+    
+    def solve_puzzle(self, puzzle):
+        """Solve a puzzle"""
+        if self.state.solve_puzzle(puzzle):
+            self.add_output(f"\nSolved puzzle: {puzzle}")
+        else:
+            self.add_output(f"\nCannot solve puzzle: {puzzle}")
+    
+    def unlock_door(self, from_room, to_room):
+        """Unlock a door"""
+        if self.state.unlock_door(from_room, to_room):
+            self.add_output(f"\nUnlocked door between {from_room} and {to_room}")
+        else:
+            self.add_output(f"\nCannot unlock door between {from_room} and {to_room}")
+    
+    def find_solution(self):
+        """Find escape solution"""
+        self.add_output("\nSearching for escape solution...")
+        solution = self.bridge.find_escape_plan()
+        
+        if solution:
+            self.add_output("\nSolution found:")
+            for step in solution:
+                self.add_output(f"- {step}")
+            self.add_output(f"Total steps required: {len(solution)}")
+        else:
+            self.add_output("\nNo escape solution found! The room might be unsolvable.")
+    
+    def run(self):
+        """Main game loop"""
+        clock = pygame.time.Clock()
+        running = True
+        
+        while running:
+            for event in pygame.event.get():
+                if event.type == QUIT:
+                    running = False
+                elif event.type == KEYDOWN:
+                    if event.key == K_UP:
+                        self.scroll_position = max(0, self.scroll_position - SCROLL_SPEED)
+                    elif event.key == K_DOWN:
+                        max_scroll = max(0, len(self.output_text) * (FONT_SIZE + 4) - SCREEN_HEIGHT + 100)
+                        self.scroll_position = min(max_scroll, self.scroll_position + SCROLL_SPEED)
+                    elif event.key == K_h:
+                        self.toggle_help()
+                elif event.type == MOUSEBUTTONDOWN:
+                    if event.button == 4:  # Scroll up
+                        self.scroll_position = max(0, self.scroll_position - SCROLL_SPEED)
+                    elif event.button == 5:  # Scroll down
+                        max_scroll = max(0, len(self.output_text) * (FONT_SIZE + 4) - SCREEN_HEIGHT + 100)
+                        self.scroll_position = min(max_scroll, self.scroll_position + SCROLL_SPEED)
+                    else:
+                        # Check button clicks
+                        for button in self.buttons:
+                            if button.is_clicked(event.pos):
+                                button.action()
+            
+            # Draw everything
+            self.screen.fill(WHITE)
+            
+            # Draw output text
+            y_pos = MARGIN - self.scroll_position
+            for i, line in enumerate(self.output_text):
+                if MARGIN <= y_pos <= SCREEN_HEIGHT - MARGIN:
+                    text_surface = self.font.render(line, True, BLACK)
+                    self.screen.blit(text_surface, (MARGIN, y_pos))
+                y_pos += FONT_SIZE + 4
+            
+            # Draw buttons
+            for button in self.buttons:
+                button.draw(self.screen)
+            
+            # Draw help if shown
+            if self.show_help:
+                self.draw_help()
+            
+            pygame.display.flip()
+            clock.tick(30)
+        
+        pygame.quit()
+        sys.exit()
+    
+    def draw_help(self):
+        """Draw help overlay"""
+        # Semi-transparent overlay
+        s = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+        s.fill((0, 0, 0, 180))
+        self.screen.blit(s, (0, 0))
+        
+        # Help text
+        help_text = [
+            "Available commands:",
+            "- Inventory: View your collected items",
+            "- Game Stats: View game constraints and limits",
+            "- Find Solution: Calculate escape path (may take time)",
+            "",
+            "Room Actions:",
+            "- Move To: Move to another room",
+            "- Pick Key: Collect a key",
+            "- Pick Piece: Collect a puzzle piece",
+            "- Move Object: Examine an object",
+            "- Solve Puzzle: Solve a puzzle with collected pieces",
+            "- Unlock Door: Unlock a door with the right key",
+            "",
+            "Press H to close help"
+        ]
+        
+        # Draw help box
+        help_width = SCREEN_WIDTH - 200
+        help_height = SCREEN_HEIGHT - 200
+        pygame.draw.rect(self.screen, WHITE, (100, 100, help_width, help_height))
+        pygame.draw.rect(self.screen, BLUE, (100, 100, help_width, help_height), 3)
+        
+        # Draw help text
+        y_pos = 120
+        for line in help_text:
+            text_surface = self.font.render(line, True, BLACK)
+            self.screen.blit(text_surface, (120, y_pos))
+            y_pos += FONT_SIZE + 4
+
+class Button:
+    def __init__(self, x, y, width, height, text, action):
+        self.rect = pygame.Rect(x, y, width, height)
+        self.text = text
+        self.action = action
+        self.font = pygame.font.SysFont('Arial', 20)
+        self.normal_color = BLUE
+        self.hover_color = GREEN
+        self.text_color = WHITE
+    
+    def draw(self, surface):
+        """Draw the button"""
+        mouse_pos = pygame.mouse.get_pos()
+        is_hovered = self.rect.collidepoint(mouse_pos)
+        
+        color = self.hover_color if is_hovered else self.normal_color
+        pygame.draw.rect(surface, color, self.rect)
+        pygame.draw.rect(surface, BLACK, self.rect, 2)  # Border
+        
+        text_surface = self.font.render(self.text, True, self.text_color)
+        text_rect = text_surface.get_rect(center=self.rect.center)
+        surface.blit(text_surface, text_rect)
+    
+    def is_clicked(self, pos):
+        """Check if button was clicked"""
+        return self.rect.collidepoint(pos)
+
+# Main entry point
 if __name__ == "__main__":
-    main()
+    bridge = PrologBridge()
+    game = EscapeRoomGUI(bridge)
+    game.run()
