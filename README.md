@@ -18,9 +18,9 @@ We followed an iterative methodology:
 
 1. The maze was represented as a graph with logical and physical constraints.
 2. A **BFS** solution was implemented in Prolog for completeness.
-3. A **heuristic A\*** algorithm was implemented in Python for efficiency.
+3. A **heuristic A\*** algorithm was implemented in Prolog.
 4. We created a **Prolog-Python bridge** using `pyswip`, allowing Python to call Prolog predicates directly.
-5. The system supports dynamic map loading using `.json` files.
+5. The system supports dynamic map by user input.
 
 ---
 
