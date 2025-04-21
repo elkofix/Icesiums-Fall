@@ -4,10 +4,12 @@
 
 :- use_module(state).
 :- use_module(facts).
-% No importamos el módulo de restricciones ya que no las usaremos
+% No importamos el modulo de restricciones ya que no las usaremos
 
-% Función principal para encontrar solución de escape sin restricciones
+% Funcion principal para encontrar solución de escape sin restricciones
 find_escape_solution_no_constraints :-
+    get_time(Start),  % Inicio del cronómetro
+
     writeln('Buscando solución de escape sin restricciones de inventario...'),
     % Obtener la habitación inicial y final
     state:player_location(StartRoom),
@@ -20,11 +22,19 @@ find_escape_solution_no_constraints :-
     
     % Ejecutar BFS para encontrar una solución
     (bfs(InitialState, GoalState, Solution) ->
+        get_time(End),  % Finaliza cronómetro
+        Time is End - Start,  % Calcula el tiempo en segundos
+        length(Solution, Steps),  
+
         format('¡Solución encontrada! Pasos para escapar: ~n'),
         print_solution(Solution),
-        format('Total de pasos requeridos: ~w~n', [length(Solution)])
+        format('Solution found in ~5f seconds! ~n', [Time]),
+        format('Total de pasos requeridos: ~w~n', [Steps]) 
     ;
-        writeln('¡No se encontró solución de escape! La habitación podría ser irresoluble.')
+        writeln('¡No se encontró solución de escape! La habitación podría ser irresoluble.'),
+        get_time(End),  % Finaliza cronómetro incluso si no hay solución
+        Time is End - Start,  % Calcula el tiempo en segundos
+        format('Execution time: ~3f seconds~n', [Time])
     ).
 
 % Implementación BFS para encontrar un camino desde el estado inicial hasta la habitación final

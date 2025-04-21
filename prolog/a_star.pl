@@ -8,24 +8,27 @@
 
 % Main function to find escape solution using A*
 find_escape_solution :-
+    get_time(Start),  % Inicia cronómetro
+
     writeln('Searching for escape solution using A*...'),
-    % Get the starting room and final room
     state:player_location(StartRoom),
     facts:final_room(FinalRoom),
     format('Planning escape from ~w to ~w~n', [StartRoom, FinalRoom]),
-    
-    % Define the initial state based on players current location
-    % State format: state(CurrentRoom, Inventory, UnlockedDoors, SolvedPuzzles, MovedObjects, CollectedPieces)
+
     InitialState = state(StartRoom, [], [], [], [], []),
-    
-    % Run A* to find a solution
-    (a_star(InitialState, GoalState, Solution) ->
-        format('Solution found! Steps to escape: ~n'),
+
+    ( a_star(InitialState, GoalState, Solution) ->
+        format('Solution found! Steps to escape:~n'),
         print_solution(Solution),
-        format('Total steps required: ~w~n', [length(Solution)])
+        length(Solution, Len),
+        format('Total steps required: ~w~n', [Len])
     ;
         writeln('No escape solution found! The room might be unsolvable.')
-    ).
+    ),
+
+    get_time(End),  % Finaliza cronómetro
+    Duration is End - Start,  % Calcula el tiempo en segundos
+    format('Tiempo de ejecución: ~5f segundos~n', [Duration]).
 
 % A* implementation to find optimal path from InitialState to the final room
 a_star(InitialState, GoalState, Steps) :-

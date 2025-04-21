@@ -69,7 +69,7 @@ help :-
     writeln("- create_custom_game. : Create a new custom escape room"),
     writeln("- load_predefined_game. : Load the predefined escape room"),
     writeln("- modify_constraints. : Modify the current game constraints").
-
+    
 % Look around the current room
 look :-
     state:player_location(Room),

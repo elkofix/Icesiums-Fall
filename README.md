@@ -4,6 +4,12 @@
 
 This project solves an escape room-like maze using both logical and heuristic search algorithms. Implementations in **Prolog** and **Python** allow comparison between exhaustive (BFS) and heuristic-driven (A*) search strategies. The environment includes doors, keys, traps, coordinates, and constraints that increase the agent's challenge in navigating from a start to a goal node.
 
+### Objectives
+- Implement BFS and A* algorithms to solve the escape room.
+- Compare their performance in terms of success rate and efficiency.
+- Develop a dynamic system for managing game constraints and configurations.
+- Integrate Prolog and Python to leverage the strengths of both languages.
+
 ---
 
 ## ⚙️ Methodology
@@ -28,7 +34,7 @@ We followed an iterative methodology:
 
 The state module handles all dynamic game state information:
 
-```pl
+```prolog
 % State representation with dynamic predicates
 :- dynamic player_location/1.
 :- dynamic inventory/1.
@@ -58,7 +64,7 @@ move_player(NewRoom) :-
 
 The constraints module implements flexible game rules:
 
-```pl
+```prolog
 % Dynamic constraint predicates
 :- dynamic max_moves/1.
 :- dynamic max_b_visits/1.
@@ -89,7 +95,7 @@ initialize_constraints :-
 
 The facts module supports both predefined and custom game setups:
 
-```pl
+```prolog
 % Dynamic game configuration
 create_custom_game :-
     clear_game_data,
@@ -112,7 +118,7 @@ custom_game_rooms :-
 
 The search modules implement pathfinding with and without constraints:
 
-```pl
+```prolog
 % BFS implementation with constraints
 bfs(InitialState, GoalState, Steps) :-
     facts:final_room(FinalRoom),
@@ -136,7 +142,7 @@ possible_action(
 
 The main module handles player interactions:
 
-```pl
+```prolog
 % Player command processing
 pick_piece(Piece) :-
     constraints:check_inventory_limit(piece),
@@ -153,6 +159,15 @@ solve_puzzle(Puzzle) :-
     forall(member(P, AllPieces), retract(has_piece(Puzzle, P))),
     assertz(puzzle_solved(Puzzle)).
 ```
+### A Implementation
+```prolog
+
+a_star(InitialState, GoalState, Steps) :-
+    % Priority queue initialized with the initial state
+    PriorityQueue = [queueItem(InitialState, 0, [])],
+    a_star_loop(PriorityQueue, [], GoalState, Steps).
+
+```
 
 ## 🔗 Prolog-Python Bridge
 
@@ -160,92 +175,37 @@ Implemented via the [`pyswip`](https://github.com/yuce/pyswip) library, allowing
 
 ---
 
-## ⚙️ Algorithms
+### Performance Metrics
+| Algorithm | Success Rate | Avg. Time (s) |
+|-----------|--------------|---------------|
+| BFS       | 100%         | 0.001601        |
+| BFS_no_constraints        | 100%         | 0.00102          |
+| A*        | 100%         | 0.001582          |
 
-### 🔍 BFS (Breadth-First Search in Prolog)
-
-- Fully exhaustive and complete.
-- Navigates while respecting constraints: locked doors, needed keys, and traps.
-- Can be **very memory intensive**, recommended to run with increased stack limit:
-
-```bash
-swipl --stack-limit=8g
-```
-
-### 🔸 A* (A-Star Search in Python)
-Uses Manhattan Distance as a heuristic.
-```python
-def manhattan_heuristic(current, goal):
-    x1, y1 = room_coords.get(current, (0, 0))
-    x2, y2 = room_coords.get(goal, (0, 0))
-    return abs(x1 - x2) + abs(y1 - y2)
-```
+### Graphs
 
 
-Considers movement cost, inventory limits, key-door dependencies, and traps.
+### excel data
+![alt text](image.png)
 
-Significantly faster for large maps or constraint-heavy environments.
+[`Comparisson btw 3 BFS, A* and BFS_no_constraints`](https://docs.google.com/spreadsheets/d/1MfzZ0VQDb-7Q6kK-UcLyal-6ciOAgLvoGHrddL3LcTI/edit?gid=0#gid=0)
+
+### Observations
+- BFS guarantees finding the shortest path but is slower due to exhaustive exploration.
+- A* is faster because it uses a heuristic to guide the search.
 
 
-#### 🧪 Results
-|Algorithm | Language | Completeness | Optimality | Performance|
-|----------|----------|------------|------------|-------------|
-|BFS | Prolog | ✅ Yes | ✅ Yes | ❌ Slow on large maps|
-|A* | Python | ✅ Yes | ✅ Yes | ✅ Fast and memory-efficient|
+## 💬 Discussion and Conclusions
 
-----
+### Discussion
+- BFS is ideal for small, constrained environments where completeness is critical.
+- A* is more suitable for larger graphs due to its efficiency.
+- The Prolog-Python bridge enables hybrid reasoning, combining logical and heuristic approaches.
 
-### 🤖 [Placeholder: Adversarial Search]
-This section is reserved for future implementation using Adversarial Search with Minimax or Alpha-Beta Pruning techniques to simulate competitive escape scenarios or dynamic threats.
-
------
-
-## ▶️ Running the Game
-
-### From prolog
-
-```bash
-swipl --stack-limit=8g
-
-?- [prolog/facts].
-?- [prolog/rules].
-?- [prolog/search].
-
-% Sample execution
-?- take_key(a).
-?- unlock_door(a, b).
-?- bfs(a, e, Path)
-```
-> ⚠️ Warning: BFS requires a lot of memory due to path branching and constraint checking. Always use the **--stack-limit=8g** flag.
-
-### From python 🐍
-
-```bash
-python main.py
-```
-
-You'll see the main menu:
-
-```bash
-===== Initial Menu =====
-1. BFS (Prolog)
-2. A* (Python)
-0. Exit
-Select an option: 
-```
-> It's very intuitive!
-
-Depending on your selection:
-- Option 1 will run the BFS search using Prolog via the bridge.
-- Option 2 runs the A* algorithm with optional path visualization, map loading, or goal selection.
-
-✅ Conclusions
-- Successfully implemented a solver using both logical and heuristic search.
-
-- The agent can navigate a maze with complex real-world constraints.
-
-- The bridge between Prolog and Python offers flexibility and a great learning opportunity.
-
-- A* shows better performance in constrained environments but requires a well-designed heuristic.
-
-- The architecture allows easy extension, testing, and future AI integrations.
+### Conclusions
+- Both BFS and A* successfully solve the escape room problem.
+- A* is significantly faster while maintaining the same success rate as BFS.
+- Future work could include:
+  - Adding more complex constraints.
+  - Exploring other heuristic algorithms like Greedy Best-First Search.
+  - Improving the Prolog-Python integration for real-time applications.
