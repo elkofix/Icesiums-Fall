@@ -13,7 +13,9 @@
     % Game configuration functions
     clear_game_data/0,
     load_predefined_game/0,
-    create_custom_game/0
+    create_custom_game/0,
+    set_game_mode/1,
+    choose_game_mode/0
 ]).
 :- use_module(adversary).
 
@@ -21,9 +23,33 @@
     object_in_room/2, hides_piece/3, piece/2,
     piece_location/3, puzzle_room/2,
     door_requirements/3, puzzle/1,
-    piece_in_room/3.
-
+    piece_in_room/3, game_mode/1. 
 % Dynamic definition functions
+
+:- (current_predicate(game_mode/1) -> true ; assertz(game_mode(standard))).
+
+set_game_mode(Mode) :-
+    retractall(game_mode(_)),
+    assertz(game_mode(Mode)).
+
+choose_game_mode :-
+    writeln("Do you want to play with an adversary?"),
+    writeln("1. No - Standard mode"),
+    writeln("2. Yes - Adversary mode"),
+    writeln("Enter your choice (1 or 2):"),
+    read(ModeChoice),
+    (ModeChoice = 1 ->
+        set_game_mode(standard),
+        true
+    ; ModeChoice = 2 ->
+        set_game_mode(adversary),
+        true
+    ;
+        writeln("Invalid choice. Please enter 1 or 2."),
+        choose_game_mode
+    ).
+
+
 add_room(Room) :-
     assertz(room(Room)).
 
@@ -83,31 +109,16 @@ clear_game_data :-
 load_predefined_game :-
     clear_game_data,
     
-    % Add rooms
-    add_room(a), add_room(b), add_room(c), add_room(d), add_room(e), add_room(f), add_room(g), add_room(h),  add_room(i),  add_room(j),  add_room(k),  add_room(l), 
-
+     add_room(a), add_room(b), add_room(c), add_room(d),
     set_final_room(d),
 
     % Add doors
-    add_door(a, b, unlocked),
-    add_door(b, a, unlocked),
-    add_door(a, e, unlocked),
-    add_door(e, a, unlocked),
-    add_door(e, f, unlocked),
-    add_door(f, g, unlocked),
-    add_door(g, h, unlocked),
-    add_door(h, e, unlocked),
-    add_door(b, c, unlocked),
-    add_door(c, b, unlocked),
-    add_door(c, d, unlocked),
-    add_door(d, c, unlocked),
-    add_door(c, i, unlocked),
-    add_door(i, c, unlocked),
-    add_door(i, j, unlocked),
-    add_door(j, k, unlocked),
-    add_door(k, l, unlocked),
-    add_door(l, i, unlocked),
-
+    add_door(a, b, locked),
+    add_door(b, a, locked),
+    add_door(b, c, locked),
+    add_door(c, b, locked),
+    add_door(c, d, locked),
+    add_door(d, c, locked),
     
     % Add keys
     add_key(a, key1),
@@ -154,10 +165,8 @@ load_predefined_game :-
     set_door_requirements(c, d, [puzzle_solved(puzzle2), has_key(key2)]),
     set_door_requirements(d, c, [puzzle_solved(puzzle2), has_key(key2)]),
     
-    (main:game_mode(adversary) ->
-        adversary:set_initial_guard_location(f),
-        ask_guard_movement_type
-
+    (game_mode(adversary) ->
+        adversary:set_initial_guard_location(d)
     ;
         true
     ),
@@ -169,7 +178,7 @@ create_custom_game :-
     writeln('Creating a custom escape room game.'),
     writeln('Let\'s set up the rooms first.'),
     custom_game_rooms.
-    (main:game_mode(adversary) ->
+    (game_mode(adversary) ->
         custom_game_guard_location,
         % Ask about guard movement type
         ask_guard_movement_type

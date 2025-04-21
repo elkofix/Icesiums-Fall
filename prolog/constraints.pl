@@ -135,7 +135,7 @@
         retract(turns_in_room(Room, Count)),
         NewCount #= Count + 1,
         assertz(turns_in_room(Room, NewCount)),
-        check_trap(Room).
+        ignore(check_trap(Room)).
 
     % Check if move limit has been reached
     check_move_limit :-
@@ -151,6 +151,7 @@
         fail.
 
     % Check if trap is activated in a room
+    % Check if trap is activated in a room
     check_trap(Room) :-
         trap(Room, turns(Limit)),
         turns_in_room(Room, Turns),
@@ -158,8 +159,11 @@
         format("TRAP ACTIVATED in room ~w after ~w turns!~n", [Room, Turns]),
         writeln("You've been caught in a trap!"),
         writeln("Game over. Type 'init_game.' to restart."),
-        fail.
-    check_trap(_).
+        true.  % Devuelve 'true' si la trampa se activa
+
+    check_trap(_) :-
+        false.  % Devuelve 'false' si no se activó la trampa
+
 
     % Check inventory limits before picking up items
     check_inventory_limit(Type) :-

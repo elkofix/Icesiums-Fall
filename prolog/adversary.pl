@@ -54,7 +54,7 @@ initialize_guard :-
 % Mover el guardia según el tipo de movimiento configurado
 move_guard :-
     % Solo mover si el juego está en el modo adversario
-    main:game_mode(adversary),
+    facts:game_mode(adversary),
     guard_location(CurrentRoom),
     state:player_location(PlayerRoom),
     % No mover si ya capturó al jugador (están en la misma habitación)

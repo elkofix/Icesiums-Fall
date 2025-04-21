@@ -5,7 +5,7 @@
 :- use_module(state).
 :- use_module(facts).
 :- use_module(constraints).
-
+:- set_prolog_flag(stack_limit, 8_589_934_592). 
 % Main function to find escape solution
 find_escape_solution :-
     writeln('Searching for escape solution...'),

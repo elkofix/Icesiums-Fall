@@ -66,7 +66,7 @@ initialize_game :-
     % Set up doors based on facts
     forall(facts:door(X, Y, State), assertz(state:door_state(X, Y, State))),
     
-    (main:game_mode(adversary) ->
+    (facts:game_mode(adversary) ->
         adversary:initialize_guard,
         adversary:guard_location(GuardRoom),
         format("El guardia comienza en la habitación ~w.~n", [GuardRoom])

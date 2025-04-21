@@ -9,28 +9,11 @@
 :- use_module(a_star).
 :- use_module(adversary).
 :- use_module(library(clpfd)).
-:- dynamic game_mode/1. 
 
-% Start game function - first ask for game mode, then game type
 start_game :-
     writeln("Welcome to the Dynamic Prolog Escape Room!"),
-    writeln("Do you want to play with an adversary?"),
-    writeln("1. No - Standard mode"),
-    writeln("2. Yes - Adversary mode"),
-    writeln("Enter your choice (1 or 2):"),
-    read(ModeChoice),
-    (ModeChoice = 1 ->
-        retractall(game_mode(_)),
-        assertz(game_mode(standard)),
-        choose_game_type
-    ; ModeChoice = 2 ->
-        retractall(game_mode(_)),
-        assertz(game_mode(adversary)),
-        choose_game_type
-    ;
-        writeln("Invalid choice. Please enter 1 or 2."),
-        start_game
-    ).
+    facts:choose_game_mode,
+    choose_game_type.
 
 % Choose game type (predefined or custom)
 choose_game_type :-
@@ -69,7 +52,7 @@ help :-
     writeln("- init_game. : Reset the current game"),
     writeln("- game_stats. : View game statistics and constraints"),
     % Display different search options based on game mode
-    game_mode(Mode),
+    facts:game_mode(Mode),
     (Mode = standard ->
         writeln("- find_escape_plan. : Find the solution to escape"),
         writeln("- find_escape_plan_no_constraints. : Find the solution ignoring inventory limits"),
@@ -77,7 +60,7 @@ help :-
     ; Mode = adversary ->
         writeln("- find_escape_plan. : Find the solution to escape"),
         writeln("- find_escape_plan_no_constraints. : Find the solution ignoring inventory limits"),
-        writeln("- find_escape_plan_a_star. : Find the solution using A* algorithm")
+        writeln("- find_escape_plan_a_star. : Find the solution using A* algorithm"),
         writeln("- guard_location. : Show current guard location")
     ),
     
@@ -92,7 +75,7 @@ look :-
     state:player_location(Room),
     format("You are in room ~w.~n~n", [Room]),
     
-    (main:game_mode(adversary),
+    (facts:game_mode(adversary),
      adversary:guard_location(GuardRoom) ->
         (Room = GuardRoom ->
             writeln("\n¡ALERTA! El guardia está en esta habitación contigo.")
@@ -279,11 +262,11 @@ find_escape_plan_a_star :-
     a_star:find_escape_solution.
 
 guard_location :-
-    main:game_mode(adversary),
+    facts:game_mode(adversary),
     adversary:guard_location(Room),
     format("El guardia está actualmente en la habitación ~w.~n", [Room]).
 guard_location :-
-    \+ main:game_mode(adversary),
+    \+ facts:game_mode(adversary),
     writeln("No hay guardia en el modo de juego estándar.").
 
 % Entry point

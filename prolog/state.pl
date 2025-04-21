@@ -6,7 +6,6 @@
     solve_puzzle/1, unlock_door/2, has_key/1, remove_key/1,
     drop_key/1, drop_piece/1, key_dropped/2, piece_dropped/3
 ]).
-:- use_module(adversary).
 
 :- dynamic player_location/1.
 :- dynamic inventory/1.
@@ -20,6 +19,7 @@
 
 :- use_module(facts).
 :- use_module(constraints).
+:- use_module(adversary).
 
 % Para evitar warnings de predicados discontiguos
 :- discontiguous pick_key/1, pick_piece/1.
@@ -136,7 +136,7 @@ move_player(NewRoom) :-
     assertz(player_location(NewRoom)),
     % Show move confirmation
     format("You moved from ~w to ~w.~n", [Current, NewRoom]),
-    (main:game_mode(adversary) ->
+    (facts:game_mode(adversary) ->
         adversary:move_guard
     ;
         true
