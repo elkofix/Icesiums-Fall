@@ -77,7 +77,7 @@ help :-
     ; Mode = adversary ->
         writeln("- find_escape_plan. : Find the solution to escape"),
         writeln("- find_escape_plan_no_constraints. : Find the solution ignoring inventory limits"),
-        writeln("- find_escape_plan_a_star. : Find the solution using A* algorithm")
+        writeln("- find_escape_plan_a_star. : Find the solution using A* algorithm"),
         writeln("- guard_location. : Show current guard location")
     ),
     
@@ -86,7 +86,7 @@ help :-
     writeln("- create_custom_game. : Create a new custom escape room"),
     writeln("- load_predefined_game. : Load the predefined escape room"),
     writeln("- modify_constraints. : Modify the current game constraints").
-
+    
 % Look around the current room
 look :-
     state:player_location(Room),

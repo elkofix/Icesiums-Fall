@@ -9,7 +9,7 @@
 % Main function to find escape solution using A*
 find_escape_solution :-
     writeln('Searching for escape solution using A*...'),
-    statistics(walltime, [Start|_]),  % Inicio del cronómetro
+    statistics(walltime, [Start|_]),  
 
     % Get the starting room and final room
     state:player_location(StartRoom),
@@ -22,14 +22,14 @@ find_escape_solution :-
     
     % Run A* to find a solution
     (a_star(InitialState, GoalState, Solution) ->
-        statistics(walltime, [End|_]),  % Fin del cronómetro
+        statistics(walltime, [End|_]),  
         Time is End - Start,
-        length(Solution, Steps),  % Calcula la longitud aquí
+        length(Solution, Steps), 
 
         format('Solution found! Steps to escape: ~n'),
         print_solution(Solution),
         format('Solution found in ~3f seconds! ~n', [Time]),
-        format('Total steps required: ~w~n', [Steps])  % Usa Steps ya calculado
+        format('Total steps required: ~w~n', [Steps])  
 
     ;
         writeln('No escape solution found! The room might be unsolvable.')
