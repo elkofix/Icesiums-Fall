@@ -22,15 +22,15 @@ find_escape_solution_no_constraints :-
     
     % Ejecutar BFS para encontrar una solución
     (bfs(InitialState, GoalState, Solution) ->
-        statistics(walltime, [End|_]),  % Fin del cronómetro
+        statistics(walltime, [End|_]), 
         Time is End - Start,
-        length(Solution, Steps),  % Calcula la longitud aquí
+        length(Solution, Steps),  
 
         format('¡Solución encontrada! Pasos para escapar: ~n'),
         print_solution(Solution),
         format('Solution found in ~3f seconds! ~n', [Time]),
 
-        format('Total de pasos requeridos: ~w~n', [Steps])  % Usa Steps ya calculado
+        format('Total de pasos requeridos: ~w~n', [Steps]) 
     ;
         writeln('¡No se encontró solución de escape! La habitación podría ser irresoluble.')
     ).
