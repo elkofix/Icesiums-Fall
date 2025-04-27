@@ -7,6 +7,8 @@ import tkinter as tk
 from tkinter import filedialog
 from integration.prolog_Bridge import PrologBridge
 from components.Cinematic import Cinematic
+from components.Button import Button
+
 from components.Solver import Solver
 from integration.Rules import Rules
 from integration.Search import Search
@@ -837,33 +839,6 @@ class EscapeRoomGUI:
             text_surface = self.font.render(line, True, BLACK)
             self.screen.blit(text_surface, (120, y_pos))
             y_pos += FONT_SIZE + 4
-
-class Button:
-    def __init__(self, x, y, width, height, text, action):
-        self.rect = pygame.Rect(x, y, width, height)
-        self.text = text
-        self.action = action
-        self.font = pygame.font.SysFont("Arial", 20)
-        self.normal_color = BLUE
-        self.hover_color = GREEN
-        self.text_color = WHITE
-
-    def draw(self, surface):
-        """Draw the button"""
-        mouse_pos = pygame.mouse.get_pos()
-        is_hovered = self.rect.collidepoint(mouse_pos)
-
-        color = self.hover_color if is_hovered else self.normal_color
-        pygame.draw.rect(surface, color, self.rect)
-        pygame.draw.rect(surface, BLACK, self.rect, 2)  # Border
-
-        text_surface = self.font.render(self.text, True, self.text_color)
-        text_rect = text_surface.get_rect(center=self.rect.center)
-        surface.blit(text_surface, text_rect)
-
-    def is_clicked(self, pos):
-        """Check if button was clicked"""
-        return self.rect.collidepoint(pos)
 
 # Main entry point
 if __name__ == "__main__":
