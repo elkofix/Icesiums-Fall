@@ -1,3 +1,5 @@
+import json
+
 class Facts:
     def __init__(self, prolog_bridge):
         self.prolog = prolog_bridge.prolog
@@ -45,6 +47,17 @@ class Facts:
         if result:
             print("Predefined game loaded successfully!")
         return result
+    
+    def get_json_map(self):
+            query = """facts:generate_dependency_graph_json(JSON)"""
+            result = list(self.prolog.query(query))[0]
+            if not result:
+                print(f"No se pudo generar el mapa")
+                return None
+            json_text = result["JSON"]
+            data = json.loads(json_text)
+            print("mapa actual",data)
+            return data
     
     def set_game_mode(self, mode):
         return bool(list(self.prolog.query(f"facts:set_game_mode({mode})")))

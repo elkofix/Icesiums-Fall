@@ -12,7 +12,11 @@ from integration.State import StateManager
 from integration.Contraints import Constraints
 from integration.Facts import Facts
 import json
-
+import networkx as nx
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_agg import FigureCanvasAgg
+import pygame
+import io
 # Initialize Pygame
 pygame.init()
 
@@ -44,7 +48,8 @@ class EscapeRoomGUI:
         self.bridge = bridge
         self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
         pygame.display.set_caption("Dynamic Escape Room Game")
-        
+        self.show_map = False  # Comienza con el mapa oculto
+        self.map = { }  # Tu estructura de datos del mapa aquí
         self.font = pygame.font.SysFont('Arial', FONT_SIZE)
         self.small_font = pygame.font.SysFont('Arial', FONT_SIZE - 4)
         
@@ -70,6 +75,7 @@ class EscapeRoomGUI:
     
     def start_screen(self):
         """Show the initial game start screen"""
+        self.show_map = False
         self.output_text = ["Welcome to the Dynamic Escape Room Game!"]
         self.add_output("Choose game mode:")
         
@@ -90,6 +96,7 @@ class EscapeRoomGUI:
     def start_standard_game(self):
         """Start game in standard mode"""
         self.mode = "standard"
+        self.state = StateManager(self.bridge)
         self.facts = Facts(self.bridge)
         self.facts.set_game_mode("standard")
         self.initialize_game()
@@ -97,11 +104,13 @@ class EscapeRoomGUI:
     def start_adversary_game(self):
         """Start game in adversary mode"""
         self.mode = "adversary"
+        self.state = StateManager(self.bridge)
         self.facts = Facts(self.bridge)
         self.facts.set_game_mode("adversary")
         self.movement_mode_screen()
             
     def initialize_game(self):
+        
         """Initialize the game"""
         self.add_output("\nChoose game type:")
         self.buttons = [
@@ -123,6 +132,7 @@ class EscapeRoomGUI:
                 self.game_initialized = True
                 self.update_game_state()
                 self.add_output("Predefined game loaded successfully!")
+                self.map = self.facts.get_json_map()
                 self.main_game_screen()
             else:
                 self.add_output("Failed to initialize game rules.")
@@ -171,6 +181,7 @@ class EscapeRoomGUI:
                     self.game_initialized = True
                     self.update_game_state()
                     self.add_output("Juego personalizado cargado exitosamente.")
+                    self.map = self.facts.get_json_map()
                     self.main_game_screen()
                 else:
                     self.add_output("Error al inicializar las reglas del juego.")
@@ -198,23 +209,99 @@ class EscapeRoomGUI:
         self.clear_outputs()
         self.buttons = [
             Button(MARGIN, SCREEN_HEIGHT - 1*(BUTTON_HEIGHT + MARGIN), BUTTON_WIDTH, BUTTON_HEIGHT, 
-                  "Inventory", self.show_inventory),
+                "Inventory", self.show_inventory),
             Button(MARGIN, SCREEN_HEIGHT - 3*(BUTTON_HEIGHT + MARGIN), BUTTON_WIDTH, BUTTON_HEIGHT, 
-                  "Find Solution BFS", self.find_solution),
-                              Button(MARGIN, SCREEN_HEIGHT - 4*(BUTTON_HEIGHT + MARGIN), BUTTON_WIDTH, BUTTON_HEIGHT, 
-                  "Find Solution BFS no Cons", self.find_solution_no),
-                              Button(MARGIN, SCREEN_HEIGHT - 5*(BUTTON_HEIGHT + MARGIN), BUTTON_WIDTH, BUTTON_HEIGHT, 
-                  "Find Solution A*", self.find_solution_start),
-                                  Button(MARGIN, SCREEN_HEIGHT - 6*(BUTTON_HEIGHT + MARGIN), BUTTON_WIDTH, BUTTON_HEIGHT, 
-                  "Clear", self.clear_outputs),
+                "Find Solution BFS", self.find_solution),
+            Button(MARGIN, SCREEN_HEIGHT - 4*(BUTTON_HEIGHT + MARGIN), BUTTON_WIDTH, BUTTON_HEIGHT, 
+                "Find Solution BFS no Cons", self.find_solution_no),
+            Button(MARGIN, SCREEN_HEIGHT - 5*(BUTTON_HEIGHT + MARGIN), BUTTON_WIDTH, BUTTON_HEIGHT, 
+                "Find Solution A*", self.find_solution_start),
+            Button(MARGIN, SCREEN_HEIGHT - 6*(BUTTON_HEIGHT + MARGIN), BUTTON_WIDTH, BUTTON_HEIGHT, 
+                "Clear", self.clear_outputs),
             Button(SCREEN_WIDTH - BUTTON_WIDTH - MARGIN, SCREEN_HEIGHT - BUTTON_HEIGHT - MARGIN, 
-                  BUTTON_WIDTH, BUTTON_HEIGHT, "New Game", self.start_screen)
+                BUTTON_WIDTH, BUTTON_HEIGHT, "New Game", self.start_screen)
         ]
         
         # Add room-specific buttons
         self.update_action_buttons()
+        
 
-    
+
+
+    def draw_map(self):
+        """Dibuja el mapa usando NetworkX con una solución robusta para Pygame"""
+        if not hasattr(self, 'map') or not self.map:
+            return
+
+        try:
+            import networkx as nx
+            import matplotlib.pyplot as plt
+            import io
+            from PIL import Image
+        except ImportError:
+            print("Advertencia: NetworkX/Matplotlib no instalados. No se dibujará el mapa.")
+            return
+
+        for node in self.map['nodes']:
+            node['is_current'] = (node['id'] == self.state.player_location())
+        # Crear el grafo
+        G = nx.DiGraph()
+
+        # Añadir nodos y aristas
+        for node in self.map['nodes']:
+            G.add_node(node['id'], **node)
+        for link in self.map['links']:
+            G.add_edge(link['source'], link['target'], **link)
+
+        # Configurar la figura
+        fig, ax = plt.subplots(figsize=(10, 6), facecolor='#1a1a2e')
+        pos = nx.spring_layout(G, seed=42)
+
+        # Personalizar nodos
+        node_colors = []
+        for node in G.nodes():
+            if G.nodes[node].get('is_current', False):
+                node_colors.append('#4cc9f0')  # Habitación actual
+            elif G.nodes[node].get('has_guard', False):
+                node_colors.append('#f72585')  # Con guardia
+            else:
+                node_colors.append('#4361ee')  # Normal
+
+        # Dibujar el grafo
+        nx.draw_networkx_nodes(G, pos, node_color=node_colors, node_size=1500, ax=ax)
+        nx.draw_networkx_labels(G, pos, font_color='white', ax=ax)
+
+        # Personalizar aristas
+        edge_colors = []
+        for u, v in G.edges():
+            if G.edges[u, v].get('state', '') == 'locked':
+                edge_colors.append('#ff9e00')  # Cerrada
+            else:
+                edge_colors.append('#4ad66d')  # Abierta
+
+        nx.draw_networkx_edges(G, pos, edge_color=edge_colors, width=2, arrows=True, ax=ax)
+
+        # Convertir a imagen compatible con Pygame
+        buf = io.BytesIO()
+        plt.savefig(buf, format='png', bbox_inches='tight', pad_inches=0, dpi=100)
+        buf.seek(0)
+        
+        # Usar PIL para cargar la imagen y luego convertir a Pygame
+        img = Image.open(buf)
+        img = img.resize((int(SCREEN_WIDTH*0.8), int(SCREEN_HEIGHT*0.7)))
+        mode = img.mode
+        size = img.size
+        data = img.tobytes()
+        
+        pygame_img = pygame.image.fromstring(data, size, mode)
+        
+        # Dibujar en la pantalla
+        self.screen.blit(pygame_img, (SCREEN_WIDTH*0.1, SCREEN_HEIGHT*0.15))
+        
+        # Limpiar
+        plt.close(fig)
+        buf.close()
+
     def update_action_buttons(self):
         """Update buttons for current room actions"""
         # Remove old action buttons (keep the first 6 buttons)
@@ -222,13 +309,20 @@ class EscapeRoomGUI:
             self.buttons = self.buttons[:6]
         
         # Get available actions from state manager
-        self.state = StateManager(self.bridge)
         self.available_actions = self.state.get_available_actions()
+        collected_items = self.state.get_collected_items()
         print("actions", self.available_actions)
         # Add action buttons
+        print(collected_items)
         y_pos = MARGIN
         for action in self.available_actions:
-            action_type, action_target = action.split(":")
+            action_type, action_target = action.split(":")  
+            print("accion", action_type)
+            print("object", action_target)          
+            if action_type == "pick_key" and action_target in collected_items['keys']:
+                continue
+            if action_type == "pick_piece" and action_target in collected_items['pieces']:
+                continue    
             btn_text = f"{action_type.replace('_', ' ').title()}: {action_target}"
             
             # Shorten long button text
@@ -244,7 +338,6 @@ class EscapeRoomGUI:
     def handle_action(self, action_str):
         """Handle a game action"""
         action_type, action_target = action_str.split(":")
-        
         if action_type == "move_to":
             self.move_player(action_target)
         elif action_type == "pick_key":
@@ -259,13 +352,13 @@ class EscapeRoomGUI:
             # For unlock, we need from_room and to_room
             current_room = self.state.player_location()
             self.unlock_door(current_room, action_target)
-        
+        self.map = self.facts.get_json_map()
+
         # Update game state after action
         self.update_game_state()
     
     def update_game_state(self):
         """Update the current game state"""
-        self.state = StateManager(self.bridge)
         state = self.state.get_current_state()
         
         if state:
@@ -442,22 +535,7 @@ class EscapeRoomGUI:
                 return
             
             # In adversary mode, move the guard
-            if self.mode == "adversary":
-                query = """
-                    with_output_to(
-                        codes(Codes),
-                        adversary:move_guard
-                    ),
-                    atom_codes(Output, Codes)
-                    """
-                result = list(self.bridge.prolog.query(query))
-                if result:
-                    output = result[0]["Output"]
-                    self.add_output(f"\n{output}")
-                else:
-                    self.add_output("\nNo guard movement output.")
-                
-            
+
             self.add_output(f"\nMoved to room {new_room}.")
         else:
             self.add_output(f"\nCannot move to room {new_room}.")
@@ -566,6 +644,8 @@ class EscapeRoomGUI:
                         self.scroll_position = min(max_scroll, self.scroll_position + SCROLL_SPEED)
                     elif event.key == K_h:
                         self.toggle_help()
+                    elif event.key == K_m:  # Tecla 'M' para alternar el mapa
+                        self.show_map = not self.show_map
                 elif event.type == MOUSEBUTTONDOWN:
                     if event.button == 4:  # Scroll up
                         self.scroll_position = max(0, self.scroll_position - SCROLL_SPEED)
@@ -588,6 +668,10 @@ class EscapeRoomGUI:
                     text_surface = self.font.render(line, True, BLACK)
                     self.screen.blit(text_surface, (MARGIN, y_pos))
                 y_pos += FONT_SIZE + 4
+            
+            # Draw map if enabled
+            if hasattr(self, 'show_map') and self.show_map:
+                self.draw_map()
             
             # Draw buttons
             for button in self.buttons:

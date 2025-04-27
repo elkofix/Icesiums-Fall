@@ -1,15 +1,26 @@
 class StateManager:
     def __init__(self, prolog_bridge):
         self.prolog = prolog_bridge.prolog
+        self.collected_items = {
+            'keys': set(),
+            'pieces': set()
+        }
 
     def player_location(self):
         """Get current player location"""
         result = list(self.prolog.query("state:player_location(Room)"))
         return result[0]['Room'] if result else None
+    
+    def guard_location(self):
+        """Get current guard location"""
+        result = list(self.prolog.query("adversary:guard_location(GuardRoom)"))
+        return result[0]['GuardRoom'] if result else None
 
     def inventory(self):
         """Get current inventory"""
+        
         result = list(self.prolog.query("state:inventory(Inv)"))
+        print("invez", result)
         return result[0]['Inv'] if result else []
 
     def door_state(self, room1, room2):
@@ -39,11 +50,40 @@ class StateManager:
 
     def pick_key(self, key):
         """Pick up a key"""
-        return bool(list(self.prolog.query(f"state:pick_key({key})")))
+        query = f"""
+            with_output_to(
+                codes(Codes),
+                state:pick_key({key})
+            ),
+            atom_codes(Output, Codes)
+        """
+        result = list(self.prolog.query(query))[0]['Output']
+        result = result.strip()  # Elimina espacios y saltos de línea
+        
+        expected_message = f"You have picked up key: {key}"
+        if result == expected_message:
+            self.collected_items['keys'].add(key)
+            print("temps agre", self.collected_items)
+            return True
+        return False
+
 
     def pick_piece(self, piece):
         """Pick up a puzzle piece"""
-        return bool(list(self.prolog.query(f"state:pick_piece({piece})")))
+        query = f"""
+                with_output_to(
+                    codes(Codes),
+                    state:pick_piece({piece})
+                ),
+                atom_codes(Output, Codes)
+            """
+        result = list(self.prolog.query(query))[0]['Output']
+        result = result.strip()  # Elimina espacios y saltos de línea
+        if "You have picked up" in result:
+            self.collected_items['pieces'].add(piece)
+            return True
+        else:
+            return False
 
     def move_object(self, obj):
         """Move an object in the room"""
@@ -55,7 +95,21 @@ class StateManager:
 
     def unlock_door(self, from_room, to_room):
         """Unlock a door between rooms"""
-        return bool(list(self.prolog.query(f"state:unlock_door({from_room}, {to_room})")))
+        query = f"""
+                with_output_to(
+                    codes(Codes),
+                    state:unlock_door({from_room}, {to_room})
+                ),
+                atom_codes(Output, Codes)
+            """
+        result = list(self.prolog.query(query))[0]['Output']
+        result = result.strip()  # Elimina espacios y saltos de línea        
+        # Verificamos si el resultado contiene "has been unlocked"
+        if "has been unlocked" in result:
+            return True
+        else:
+            return False
+
 
     def has_key(self, key):
         """Check if player has a key"""
@@ -67,11 +121,39 @@ class StateManager:
 
     def drop_key(self, key):
         """Drop a key in current room"""
-        return bool(list(self.prolog.query(f"state:drop_key({key})")))
+        query = f"""
+                with_output_to(
+                    codes(Codes),
+                    state:drop_key({key})
+                ),
+                atom_codes(Output, Codes)
+            """
+        result = list(self.prolog.query(query))[0]['Output']
+        result = result.strip()  # Elimina espacios y saltos de línea        
+        if "No tienes" in result:
+            return False
+        else:
+            self.collected_items['keys'].discard(key)
+            return True
+
 
     def drop_piece(self, piece):
         """Drop a puzzle piece in current room"""
-        return bool(list(self.prolog.query(f"state:drop_piece({piece})")))
+        query = f"""
+                with_output_to(
+                    codes(Codes),
+                    state:drop_piece({piece})
+                ),
+                atom_codes(Output, Codes)
+            """
+        result = list(self.prolog.query(query))[0]['Output']
+        result = result.strip()  # Elimina espacios y saltos de línea 
+        if "No tienes" in result:
+            return False
+            
+        else:
+            self.collected_items['pieces'].discard(piece)
+            return True
 
     def key_dropped(self, key, room):
         """Check if a key was dropped in a room"""
@@ -191,3 +273,19 @@ class StateManager:
                 actions.append(f"move_to:{room['OtherRoom']}")
         
         return actions
+    
+    def get_collected_items(self):
+        """Return all collected keys and pieces"""
+        print("entrego",self.collected_items)
+        return {
+            'keys': list(self.collected_items['keys']),
+            'pieces': list(self.collected_items['pieces'])
+        }
+
+    def has_collected_key(self, key):
+        """Check if a specific key has been collected"""
+        return key in self.collected_items['keys']
+
+    def has_collected_piece(self, piece):
+        """Check if a specific puzzle piece has been collected"""
+        return piece in self.collected_items['pieces']
