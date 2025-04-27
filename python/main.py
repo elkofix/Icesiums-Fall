@@ -20,6 +20,9 @@ import io
 # Initialize Pygame
 pygame.init()
 
+
+
+
 # Constants
 SCREEN_WIDTH = 1024
 SCREEN_HEIGHT = 650
