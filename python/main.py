@@ -6,6 +6,7 @@ import re
 import tkinter as tk
 from tkinter import filedialog
 from integration.prolog_Bridge import PrologBridge
+from components.Cinematic import Cinematic
 from integration.Rules import Rules
 from integration.Search import Search
 from integration.SearchNoConstraints import SearchNoConstraints
@@ -19,34 +20,16 @@ from matplotlib.backends.backend_agg import FigureCanvasAgg
 import pygame
 import io
 import time  # Para controlar el tiempo de las imágenes
+from assets.texts.constants import SCREEN_WIDTH, SCREEN_HEIGHT, BUTTON_WIDTH, BUTTON_HEIGHT, MARGIN, FONT_SIZE, SCROLL_SPEED
+from assets.texts.colors import WHITE, BLACK, GRAY, LIGHT_GRAY, DARK_GRAY, RED, GREEN, BLUE, YELLOW, PURPLE
 
 # Initialize Pygame
 pygame.init()
 pygame.mixer.init()
-# Constants
-SCREEN_WIDTH = 1024
-SCREEN_HEIGHT = 650
-BUTTON_WIDTH = 200
-BUTTON_HEIGHT = 40
-MARGIN = 20
-FONT_SIZE = 24
-SCROLL_SPEED = 20
-
-# Colors
-WHITE = (255, 255, 255)
-BLACK = (0, 0, 0)
-GRAY = (200, 200, 200)
-LIGHT_GRAY = (230, 230, 230)
-DARK_GRAY = (100, 100, 100)
-RED = (255, 0, 0)
-GREEN = (0, 255, 0)
-BLUE = (0, 0, 255)
-YELLOW = (255, 255, 0)
-PURPLE = (128, 0, 128)
-
 
 class EscapeRoomGUI:
     def __init__(self, bridge):
+        self.cinematic = Cinematic(self.start_screen)
         self.bridge = bridge
         self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
         pygame.display.set_caption("Dynamic Escape Room Game")
@@ -64,41 +47,6 @@ class EscapeRoomGUI:
         self.font = self.retro_font
         self.small_font = self.retro_font_small
 
-        self.intro_texts = [
-            "La Torre de Icesium se desmoronaba. Algo esta mal.",
-            "La Torre de Icesium se desmoronaba. Algo esta mal.",
-            "La Torre de Icesium se desmoronaba. Algo esta mal.",
-            "La Torre de Icesium se desmoronaba. Algo esta mal.",
-            "La Torre de Icesium se desmoronaba. Algo esta mal.",
-            "La Torre de Icesium se desmoronaba. Algo esta mal.",
-            "La Torre de Icesium se desmoronaba. Algo esta mal.",
-            "",
-            "Las runas protectoras se apagaron y la sala era un caos.",
-            "Las runas protectoras se apagaron y la sala era un caos.",
-            "Las runas protectoras se apagaron y la sala era un caos.",
-            "Las runas protectoras se apagaron y la sala era un caos.",
-            "Las runas protectoras se apagaron y la sala era un caos.",
-            "",
-            "Angela, la hechicera, invoca un conjuro que hizo temblar la torre.",
-            "Angela, la hechicera, invoca un conjuro que hizo temblar la torre.",
-            "Angela, la hechicera, invoca un conjuro que hizo temblar la torre.",
-            "Angela, la hechicera, invoca un conjuro que hizo temblar la torre.",
-            "Angela, la hechicera, invoca un conjuro que hizo temblar la torre.",
-            "",
-            "Las puertas se cerraron a tu espalda. No hay vuelta atras.",
-            "Las puertas se cerraron a tu espalda. No hay vuelta atras.",
-            "Las puertas se cerraron a tu espalda. No hay vuelta atras.",
-            "Las puertas se cerraron a tu espalda. No hay vuelta atras.",
-            "Las puertas se cerraron a tu espalda. No hay vuelta atras.",
-            "",
-            "Del espejo emerge una sombra. Alguien —o algo— viene por por ti.",
-            "Del espejo emerge una sombra. Alguien —o algo— viene por por ti.",
-            "Del espejo emerge una sombra. Alguien —o algo— viene por por ti.",
-            "Del espejo emerge una sombra. Alguien —o algo— viene por por ti.",
-            "Del espejo emerge una sombra. Alguien —o algo— viene por por ti.",
-            "Del espejo emerge una sombra. Alguien —o algo— viene por por ti.",
-            "",
-        ]
         # Game state
         self.current_room = None
         self.inventory = []
@@ -108,8 +56,6 @@ class EscapeRoomGUI:
         self.keys = []
         self.pieces = []
         self.available_actions = []
-        self.intro_image_margin_top = 100  # Margen superior de 100px
-        self.intro_image_margin_sides = 200  # Margen horizontal de 200px
 
         # UI state
         self.output_text = []
@@ -117,191 +63,6 @@ class EscapeRoomGUI:
         self.mode = "standard"
         self.game_initialized = False
         self.show_help = False
-
-        # Cinemática introductoria
-        self.intro_completed = False
-        self.intro_images = []
-        self.current_intro_image = 0
-        self.intro_start_time = 0
-        self.intro_music = None
-
-        # Cargar recursos de la cinemática
-        self.load_intro_resources()
-
-        # Iniciar con la cinemática
-        self.play_intro()
-
-    def load_intro_resources(self):
-        """Cargar imágenes y música para la cinemática introductoria"""
-        try:
-            # Cargar imágenes (asegúrate de que estos archivos existan en tu directorio)
-            for i in range(1, 34):
-                img_path = f"intro_image{i}.png"
-                if os.path.exists(img_path):
-                    # Cargar la imagen manteniendo su relación de aspecto
-                    original_image = pygame.image.load(img_path)
-                    original_width, original_height = original_image.get_size()
-
-                    # Calcular dimensiones máximas disponibles
-                    max_width = SCREEN_WIDTH - 2 * self.intro_image_margin_sides
-                    max_height = (
-                        SCREEN_HEIGHT - self.intro_image_margin_top - 300
-                    )  # 50px para el texto de "saltar"
-
-                    # Calcular nuevas dimensiones manteniendo relación de aspecto
-                    ratio = min(
-                        max_width / original_width, max_height / original_height
-                    )
-                    new_width = int(original_width * ratio)
-                    new_height = int(original_height * ratio)
-
-                    # Escalar la imagen
-                    image = pygame.transform.scale(
-                        original_image, (new_width, new_height)
-                    )
-                    self.intro_images.append(
-                        {"surface": image, "width": new_width, "height": new_height}
-                    )
-                else:
-                    print(f"Advertencia: No se encontró {img_path}")
-                    # Crear una imagen de relleno con las dimensiones máximas
-                    placeholder = pygame.Surface((max_width, max_height))
-                    placeholder.fill((50, 50, 50))  # Gris oscuro
-                    font = pygame.font.SysFont("Arial", 30)
-                    text = font.render(f"Intro Image {i}", True, (200, 200, 200))
-                    text_rect = text.get_rect(center=(max_width // 2, max_height // 2))
-                    placeholder.blit(text, text_rect)
-
-                    self.intro_images.append(
-                        {
-                            "surface": placeholder,
-                            "width": max_width,
-                            "height": max_height,
-                        }
-                    )
-            while len(self.intro_texts) < len(self.intro_images):
-                self.intro_texts.append("Continúa la historia...")
-
-            # Cargar música (igual que antes)
-            if os.path.exists("intro_music.mp3"):
-                self.intro_music = pygame.mixer.Sound("intro_music.mp3")
-            else:
-                print("Advertencia: No se encontró intro_music.mp3")
-
-        except Exception as e:
-            print(f"Error al cargar recursos de la cinemática: {e}")
-            # Si hay error, saltar la cinemática
-            self.intro_completed = True
-            self.start_screen()
-
-    def draw_intro(self):
-        """Dibujar la imagen actual de la cinemática con los nuevos márgenes"""
-        if not self.intro_completed and self.intro_images:
-            # Dibujar fondo negro
-            self.screen.fill(BLACK)
-
-            # Obtener la imagen actual
-            current_img = self.intro_images[self.current_intro_image]
-            img_surface = current_img["surface"]
-            img_width = current_img["width"]
-            img_height = current_img["height"]
-
-            # Calcular posición centrada
-            x_pos = (SCREEN_WIDTH - img_width) // 2
-            y_pos = self.intro_image_margin_top
-
-            # Dibujar la imagen
-            self.screen.blit(img_surface, (x_pos, y_pos))
-
-            # Dibujar el texto correspondiente debajo de la imagen
-            if self.current_intro_image < len(self.intro_texts):
-                text_lines = self.wrap_text(
-                    self.intro_texts[self.current_intro_image],
-                    self.retro_font_small,
-                    SCREEN_WIDTH - 2 * self.intro_image_margin_sides,
-                )
-
-                text_y = y_pos + img_height + 20  # 20px debajo de la imagen
-
-                for line in text_lines:
-                    text_surface = self.retro_font_small.render(
-                        line, True, (255, 255, 0)
-                    )  # Texto amarillo
-                    text_rect = text_surface.get_rect(
-                        center=(SCREEN_WIDTH // 2, text_y)
-                    )
-                    self.screen.blit(text_surface, text_rect)
-                    text_y += 30  # Espacio entre líneas
-            # Dibujar un texto indicando que se puede saltar
-            skip_text = self.retro_font_small.render(
-                "Presiona ESPACIO para saltar la intro", True, (255, 255, 255)
-            )
-            text_rect = skip_text.get_rect(
-                center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT - 30)
-            )
-            self.screen.blit(skip_text, text_rect)
-
-    def wrap_text(self, text, font, max_width):
-        """Envuelve el texto en múltiples líneas para que quepa en el ancho especificado"""
-        words = text.split(" ")
-        lines = []
-        current_line = []
-
-        for word in words:
-            test_line = " ".join(current_line + [word])
-            test_width = font.size(test_line)[0]
-
-            if test_width <= max_width:
-                current_line.append(word)
-            else:
-                lines.append(" ".join(current_line))
-                current_line = [word]
-
-        if current_line:
-            lines.append(" ".join(current_line))
-
-        return lines
-
-    def play_intro(self):
-        """Reproducir la cinemática introductoria"""
-        if not self.intro_images:
-            self.intro_completed = True
-            self.start_screen()
-            return
-
-        # Reproducir música si está disponible
-        if self.intro_music:
-            self.intro_music.play()
-
-        # Configurar temporizador para la primera imagen
-        self.intro_start_time = time.time()
-        self.current_intro_image = 0
-
-    def update_intro(self):
-        """Actualizar la cinemática introductoria"""
-        if self.intro_completed or not self.intro_images:
-            return
-
-        current_time = time.time()
-        # Cambiar de imagen cada 3 segundos
-        if current_time - self.intro_start_time >= 2.2:
-            self.current_intro_image += 1
-            self.intro_start_time = current_time
-
-            # Si hemos mostrado todas las imágenes, terminar la cinemática
-            if self.current_intro_image >= len(self.intro_images):
-                self.intro_completed = True
-                if self.intro_music:
-                    self.intro_music.stop()
-                self.start_screen()
-
-    def skip_intro(self):
-        """Saltar la cinemática introductoria"""
-        if not self.intro_completed:
-            self.intro_completed = True
-            if self.intro_music:
-                self.intro_music.stop()
-            self.start_screen()
 
     def start_screen(self):
         """Show the initial game start screen"""
@@ -403,6 +164,7 @@ class EscapeRoomGUI:
                 self.add_output("Failed to initialize game rules.")
         else:
             self.add_output("Failed to load predefined game.")
+            
 
     def create_custom_game(self):
         """Open a file dialog to load a custom game config JSON (for Pygame)"""
@@ -945,45 +707,6 @@ class EscapeRoomGUI:
         else:
             self.add_output(f"\nCannot unlock door between {from_room} and {to_room}")
 
-    def find_solution(self):
-        """Find escape solution"""
-        self.add_output("\nSearching for escape solution with bfs...")
-        solution = self.bridge.find_escape_plan()
-
-        if solution:
-            self.add_output("\nSolution found:", False, 80)
-            for step in solution:
-                self.add_output(f"- {step}", False, 80)
-            self.add_output(f"Total steps required: {len(solution)}", False, 80)
-        else:
-            self.add_output("\nNo escape solution found! The room might be unsolvable.")
-
-    def find_solution_no(self):
-        """Find escape solution"""
-        self.add_output("\nSearching for escape solution with no constraints...")
-        solution = self.bridge.find_escape_plan_no()
-
-        if solution:
-            self.add_output("\nSolution found:", False, 80)
-            for step in solution:
-                self.add_output(f"- {step}", False, 80)
-            self.add_output(f"Total steps required: {len(solution)}", False, 80)
-        else:
-            self.add_output("\nNo escape solution found! The room might be unsolvable.")
-
-    def find_solution_start(self):
-        """Find escape solution"""
-        self.add_output("\nSearching for escape solution with A*...")
-        solution = self.bridge.find_escape_plan_star()
-
-        if solution:
-            self.add_output("\nSolution found:", False, 80)
-            for step in solution:
-                self.add_output(f"- {step}", False, 80)
-            self.add_output(f"Total steps required: {len(solution)}", False, 80)
-        else:
-            self.add_output("\nNo escape solution found! The room might be unsolvable.")
-
     def run(self):
         """Main game loop"""
         clock = pygame.time.Clock()
@@ -994,8 +717,8 @@ class EscapeRoomGUI:
                 if event.type == QUIT:
                     running = False
                 elif event.type == KEYDOWN:
-                    if not self.intro_completed and event.key == K_SPACE:
-                        self.skip_intro()
+                    if not self.cinematic.intro_completed and event.key == K_SPACE:
+                        self.cinematic.skip_intro()
                     elif event.key == K_UP:
                         self.scroll_position = max(
                             0, self.scroll_position - SCROLL_SPEED
@@ -1015,8 +738,8 @@ class EscapeRoomGUI:
                     elif event.key == K_m:
                         self.show_map = not self.show_map
                 elif event.type == MOUSEBUTTONDOWN:
-                    if not self.intro_completed:
-                        self.skip_intro()
+                    if not self.cinematic.intro_completed:
+                        self.cinematic.skip_intro()
                     elif event.button == 4:
                         self.scroll_position = max(
                             0, self.scroll_position - SCROLL_SPEED
@@ -1040,14 +763,14 @@ class EscapeRoomGUI:
                                     button.action()
 
             # Actualizar lógica del juego o cinemática
-            if not self.intro_completed:
-                self.update_intro()
+            if not self.cinematic.intro_completed:
+                self.cinematic.update_intro()
 
             # Dibujar todo
             self.screen.fill(WHITE)
 
-            if not self.intro_completed:
-                self.draw_intro()
+            if not self.cinematic.intro_completed:
+                self.cinematic.draw_intro()
             else:
                 # Dibujar texto del juego
                 y_pos = MARGIN - self.scroll_position
@@ -1113,7 +836,6 @@ class EscapeRoomGUI:
             self.screen.blit(text_surface, (120, y_pos))
             y_pos += FONT_SIZE + 4
 
-
 class Button:
     def __init__(self, x, y, width, height, text, action):
         self.rect = pygame.Rect(x, y, width, height)
@@ -1140,7 +862,6 @@ class Button:
     def is_clicked(self, pos):
         """Check if button was clicked"""
         return self.rect.collidepoint(pos)
-
 
 # Main entry point
 if __name__ == "__main__":
