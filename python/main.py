@@ -7,6 +7,7 @@ import tkinter as tk
 from tkinter import filedialog
 from integration.prolog_Bridge import PrologBridge
 from components.Cinematic import Cinematic
+from components.Solver import Solver
 from integration.Rules import Rules
 from integration.Search import Search
 from integration.SearchNoConstraints import SearchNoConstraints
@@ -31,6 +32,7 @@ class EscapeRoomGUI:
     def __init__(self, bridge):
         self.cinematic = Cinematic(self.start_screen)
         self.bridge = bridge
+        self.solver =  Solver(self.bridge, self.add_output)
         self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
         pygame.display.set_caption("Dynamic Escape Room Game")
         self.show_map = False
@@ -261,7 +263,7 @@ class EscapeRoomGUI:
                 BUTTON_WIDTH,
                 BUTTON_HEIGHT,
                 "Find Solution BFS",
-                self.find_solution,
+                self.solver.find_solution,
             ),
             Button(
                 MARGIN,
@@ -269,7 +271,7 @@ class EscapeRoomGUI:
                 BUTTON_WIDTH,
                 BUTTON_HEIGHT,
                 "Find Solution BFS no Cons",
-                self.find_solution_no,
+                self.solver.find_solution_no,
             ),
             Button(
                 MARGIN,
@@ -277,7 +279,7 @@ class EscapeRoomGUI:
                 BUTTON_WIDTH,
                 BUTTON_HEIGHT,
                 "Find Solution A*",
-                self.find_solution_start,
+                self.solver.find_solution_start,
             ),
             Button(
                 MARGIN,
@@ -755,8 +757,8 @@ class EscapeRoomGUI:
                             max_scroll, self.scroll_position + SCROLL_SPEED
                         )
                     else:
-                        if not self.intro_completed:
-                            self.skip_intro()
+                        if not self.cinematic.intro_completed:
+                            self.cinematic.skip_intro()
                         else:
                             for button in self.buttons:
                                 if button.is_clicked(event.pos):

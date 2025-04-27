@@ -13,7 +13,6 @@ class Cinematic:
         self.intro_image_margin_top = 100  # Margen superior de 100px
         self.intro_image_margin_sides = 200  # Margen horizontal de 200px
         self.intro_texts = DIALOGS
-
         try:
             self.retro_font = pygame.font.Font(
                 "retro_font.ttf", 24
