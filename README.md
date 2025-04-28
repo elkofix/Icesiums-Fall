@@ -13,6 +13,21 @@ This project solves an escape room-like maze using both logical and heuristic se
 ---
 
 
+### Requirements
+
+You should have python 3.12 and swipl installed on your machine, then install the libraries needed with
+
+```sh
+cd python
+pip install -r requirements.txt
+```
+
+Now to run the game you should
+
+```sh
+python main.py
+```
+
 ### Controls
 
 M - Open the map
