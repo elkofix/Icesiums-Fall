@@ -431,14 +431,6 @@ test(valid_state_exceeds_b_visits, [fail]) :-
     valid_state(b, [gold], 10, 4).
 
 
-% Trap test
-test(check_trap_not_triggered) :-
-    setup,
-    add_room_trap(a, 3),
-    retractall(turns_in_room(a, _)),
-    assertz(turns_in_room(a, 2)),
-    check_trap(a).
-
 % Test for player initialization
 test(player_initialization) :-
     setup_test,

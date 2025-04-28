@@ -38,6 +38,20 @@ We followed an iterative methodology:
 
 ![image](https://github.com/user-attachments/assets/af736137-34ac-4db2-b05a-06365f5714da)
 
+### Test
+To run python test
+
+```sh
+python pytest
+```
+
+To run prolog test
+
+```sh
+swipl
+[prolog/test_prolog].
+run_tests.
+```
 ### Game State Management
 
 The state module handles all dynamic game state information:
@@ -307,3 +321,4 @@ The implementation of different search algorithms (BFS and A*) for solving the e
   - Adding more complex constraints.
   - Exploring other heuristic algorithms like Greedy Best-First Search.
   - Improving the Prolog-Python integration for real-time applications.
+
