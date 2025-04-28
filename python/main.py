@@ -34,11 +34,15 @@ class EscapeRoomGUI:
     def __init__(self, bridge):
         self.cinematic = Cinematic(self.start_screen)
         self.bridge = bridge
+        self.last_click_time = 0    # Para controlar dobles clics
+        self.clear_all = False
         self.solver =  Solver(self.bridge, self.add_output)
+        self.solver.set_help_callback(self.add_help_output)
         self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
         pygame.display.set_caption("Dynamic Escape Room Game")
         self.show_map = False
         self.map = {}
+        self.object_positions = {}  # Diccionario para guardar posiciones de objetos
         try:
             self.retro_font = pygame.font.Font(
                 "retro_font.ttf", 24
@@ -61,50 +65,148 @@ class EscapeRoomGUI:
         self.pieces = []
         self.available_actions = []
 
+        self.logo = None
+        self.load_logo()
+    
         # UI state
         self.output_text = []
         self.scroll_position = 0
         self.mode = "standard"
         self.game_initialized = False
         self.show_help = False
+        self.background = None
+        self.load_background()
+        self.object_images = {}  # Diccionario para almacenar imágenes de objetos
+        self.load_object_images()  # Cargar imágenes de objetos al inicializar
+
+    def load_object_images(self):
+        """Cargar imágenes para los objetos disponibles"""
+        object_image_files = {
+            "painting": "painting.png",
+            "cabinet": "cabinet.png",
+            "box": "box.png",
+            "bookshelf": "bookshelf.png",
+            "rug": "rug.png"
+        }
+        
+        for obj_name, filename in object_image_files.items():
+            try:
+                image_path = os.path.join("assets", "images", filename)
+                if os.path.exists(image_path):
+                    img = pygame.image.load(image_path).convert_alpha()
+                    # Escalar imágenes a un tamaño consistente
+                    self.object_images[obj_name] = pygame.transform.scale(img, (80, 80))
+                else:
+                    print(f"Imagen no encontrada: {image_path}")
+            except Exception as e:
+                print(f"Error cargando imagen {filename}: {e}")
+                # Crear una imagen de placeholder si falla la carga
+                placeholder = pygame.Surface((80, 80), pygame.SRCALPHA)
+                pygame.draw.rect(placeholder, (255, 0, 255), (0, 0, 80, 80))
+                pygame.draw.rect(placeholder, (0, 0, 0), (0, 0, 80, 80), 2)
+                text = pygame.font.SysFont("Arial", 12).render(obj_name, True, (0, 0, 0))
+                placeholder.blit(text, (40 - text.get_width() // 2, 40 - text.get_height() // 2))
+                self.object_images[obj_name] = placeholder
+
+    def get_object_image(self, obj_name):
+        """Obtener la imagen para un objeto, o una aleatoria si no existe"""
+        # Primero buscar coincidencia exacta
+        if obj_name in self.object_images:
+            return self.object_images[obj_name]
+        
+        # Buscar coincidencia parcial (por si el nombre tiene prefijo/sufijo)
+        for key in self.object_images:
+            if key in obj_name.lower() or obj_name.lower() in key:
+                return self.object_images[key]
+        
+        # Si no se encuentra, devolver una imagen aleatoria
+        import random
+        if self.object_images:
+            return random.choice(list(self.object_images.values()))
+        
+        # Si no hay imágenes cargadas, crear un placeholder
+        placeholder = pygame.Surface((80, 80), pygame.SRCALPHA)
+        pygame.draw.rect(placeholder, (255, 255, 0), (0, 0, 80, 80))
+        pygame.draw.rect(placeholder, (0, 0, 0), (0, 0, 80, 80), 2)
+        text = pygame.font.SysFont("Arial", 12).render(obj_name, True, (0, 0, 0))
+        placeholder.blit(text, (40 - text.get_width() // 2, 40 - text.get_height() // 2))
+        return placeholder
+    
+    def load_background(self):
+        """Carga la imagen de fondo con manejo de errores"""
+        try:
+            background_path = "assets/images/background.png"
+            if os.path.exists(background_path):
+                self.background = pygame.image.load(background_path).convert()
+                # Escalar la imagen al tamaño de la pantalla
+                self.background = pygame.transform.scale(self.background, (SCREEN_WIDTH, SCREEN_HEIGHT))
+            else:
+                print(f"Fondo no encontrado en {background_path}")
+        except Exception as e:
+            print(f"Error cargando fondo: {e}")
+            self.background = None
+
+
+    def load_logo(self):
+        """Carga el logo con manejo de errores"""
+        try:
+            logo_path = "assets/images/logo.png"  # Asegúrate de que la ruta es correcta
+            if os.path.exists(logo_path):
+                original_logo = pygame.image.load(logo_path)
+                # Convertir para mejor rendimiento y soporte de transparencia
+                self.logo = original_logo.convert_alpha()
+                # Escalar manteniendo relación de aspecto
+                logo_width = min(300, SCREEN_WIDTH - 400)  # Máximo 400px o el ancho de pantalla -100
+                aspect_ratio = self.logo.get_width() / self.logo.get_height()
+                logo_height = int(logo_width / aspect_ratio)
+                self.logo = pygame.transform.scale(self.logo, (logo_width, logo_height))
+            else:
+                print(f"Logo no encontrado en {logo_path}")
+        except Exception as e:
+            print(f"Error cargando logo: {e}")
+            self.logo = None
+
 
     def start_screen(self):
         """Show the initial game start screen"""
+        self.clear_all = False
+        self.game_initialized = False
         self.show_map = False
-        self.output_text = ["Welcome to the Dynamic Escape Room Game!"]
-        self.add_output("Choose game mode:")
+        self.clear_outputs()
 
-        # Create buttons for game mode selection
+        # Create buttons for game mode selection (sin fondo ni borde)
         self.buttons = [
             Button(
                 SCREEN_WIDTH // 2 - BUTTON_WIDTH // 2,
-                200,
+                300,
                 BUTTON_WIDTH,
                 BUTTON_HEIGHT,
-                "Standard Mode",
+                "Modo estandar",
                 self.start_standard_game,
+                bg_color=None,  # Sin fondo
+                text_color=WHITE,  # Texto blanco
+                border_color=None,  # Sin borde
+                font=self.retro_font
             ),
             Button(
                 SCREEN_WIDTH // 2 - BUTTON_WIDTH // 2,
-                260,
+                360,
                 BUTTON_WIDTH,
                 BUTTON_HEIGHT,
-                "Adversary Mode",
+                "Modo adversario",
                 self.start_adversary_game,
-            ),
-            Button(
-                SCREEN_WIDTH // 2 - BUTTON_WIDTH // 2,
-                400,
-                BUTTON_WIDTH,
-                BUTTON_HEIGHT,
-                "Help",
-                self.toggle_help,
-            ),
+                bg_color=None,
+                text_color=WHITE,
+                border_color=None,
+                font=self.retro_font
+            )
         ]
 
     def toggle_help(self):
-        """Toggle help display"""
+        """Toggle help display and clear outputs when opening"""
         self.show_help = not self.show_help
+        if self.show_help:
+            self.clear_outputs()
 
     def start_standard_game(self):
         """Start game in standard mode"""
@@ -124,14 +226,15 @@ class EscapeRoomGUI:
 
     def initialize_game(self):
         """Initialize the game"""
-        self.add_output("\nChoose game type:")
+        self.clear_outputs()
+        self.add_output("\nEscoger modo de juego:")
         self.buttons = [
             Button(
                 SCREEN_WIDTH // 2 - BUTTON_WIDTH - MARGIN,
                 200,
                 BUTTON_WIDTH,
                 BUTTON_HEIGHT,
-                "Predefined Game",
+                "Juego precargado",
                 self.load_predefined_game,
             ),
             Button(
@@ -139,7 +242,7 @@ class EscapeRoomGUI:
                 200,
                 BUTTON_WIDTH,
                 BUTTON_HEIGHT,
-                "Custom Game",
+                "Cargar juego",
                 self.create_custom_game,
             ),
             Button(
@@ -147,7 +250,7 @@ class EscapeRoomGUI:
                 300,
                 BUTTON_WIDTH,
                 BUTTON_HEIGHT,
-                "Back",
+                "Volver",
                 self.start_screen,
             ),
         ]
@@ -227,14 +330,15 @@ class EscapeRoomGUI:
 
     def movement_mode_screen(self):
         """Guard movement screen"""
-        self.add_output("How should the guard move?")
+        self.clear_outputs()
+        self.add_output("Movimiento del guardia:")
         self.buttons = [
             Button(
                 SCREEN_WIDTH // 2 - BUTTON_WIDTH // 2,
                 200,
                 BUTTON_WIDTH,
                 BUTTON_HEIGHT,
-                "Predictive",
+                "Predictivo",
                 lambda: self.set_guard_movement(1),
             ),
             Button(
@@ -242,7 +346,7 @@ class EscapeRoomGUI:
                 260,
                 BUTTON_WIDTH,
                 BUTTON_HEIGHT,
-                "Random",
+                "Aleatorio",
                 lambda: self.set_guard_movement(2),
             ),
         ]
@@ -251,46 +355,6 @@ class EscapeRoomGUI:
         """Main game screen with all actions"""
         self.clear_outputs()
         self.buttons = [
-            Button(
-                MARGIN,
-                SCREEN_HEIGHT - 1 * (BUTTON_HEIGHT + MARGIN),
-                BUTTON_WIDTH,
-                BUTTON_HEIGHT,
-                "Inventory",
-                self.show_inventory,
-            ),
-            Button(
-                MARGIN,
-                SCREEN_HEIGHT - 3 * (BUTTON_HEIGHT + MARGIN),
-                BUTTON_WIDTH,
-                BUTTON_HEIGHT,
-                "Find Solution BFS",
-                self.solver.find_solution,
-            ),
-            Button(
-                MARGIN,
-                SCREEN_HEIGHT - 4 * (BUTTON_HEIGHT + MARGIN),
-                BUTTON_WIDTH,
-                BUTTON_HEIGHT,
-                "Find Solution BFS no Cons",
-                self.solver.find_solution_no,
-            ),
-            Button(
-                MARGIN,
-                SCREEN_HEIGHT - 5 * (BUTTON_HEIGHT + MARGIN),
-                BUTTON_WIDTH,
-                BUTTON_HEIGHT,
-                "Find Solution A*",
-                self.solver.find_solution_start,
-            ),
-            Button(
-                MARGIN,
-                SCREEN_HEIGHT - 6 * (BUTTON_HEIGHT + MARGIN),
-                BUTTON_WIDTH,
-                BUTTON_HEIGHT,
-                "Clear",
-                self.clear_outputs,
-            ),
             Button(
                 SCREEN_WIDTH - BUTTON_WIDTH - MARGIN,
                 SCREEN_HEIGHT - BUTTON_HEIGHT - MARGIN,
@@ -382,33 +446,117 @@ class EscapeRoomGUI:
         plt.close(fig)
         buf.close()
 
+    def safe_pick_key(self, key):
+        """Wrapper para pick_key que evita doble llamada"""
+        current_time = time.time()
+        if current_time - self.last_click_time > 0.3:  # 300ms de debounce
+            self.last_click_time = current_time
+            self.pick_key(key)
+           
+
+
+    def safe_pick_piece(self, piece):
+        """Wrapper para pick_piece que evita doble llamada"""
+        current_time = time.time()
+        if current_time - self.last_click_time > 0.3:  # 300ms de debounce
+            self.last_click_time = current_time
+            self.pick_piece(piece)
+
+
+    def load_image(self, filename, size):
+        """Load and scale an image"""
+        try:
+            image_path = os.path.join("assets", "images", filename)
+            if os.path.exists(image_path):
+                img = pygame.image.load(image_path).convert_alpha()
+                return pygame.transform.scale(img, size)
+        except Exception as e:
+            print(f"Error loading image {filename}: {e}")
+        # Return a placeholder surface if image can't be loaded
+        surface = pygame.Surface(size, pygame.SRCALPHA)
+        pygame.draw.rect(surface, (255, 0, 0), (0, 0, size[0], size[1]))
+        return surface
+    
     def update_action_buttons(self):
         """Update buttons for current room actions"""
-        # Remove old action buttons (keep the first 6 buttons)
-        if len(self.buttons) > 6:
-            self.buttons = self.buttons[:6]
+        # Limpiar botones existentes (excepto los principales como "New Game")
+        self.buttons = [
+            btn for btn in self.buttons if not isinstance(btn, ImageButton) 
+        ]
+        self.buttons = [
+            btn for btn in self.buttons if isinstance(btn, Button) if btn.text == "New Game"
+        ]  
 
-        # Get available actions from state manager
+        # Cargar imágenes
+        key_img = self.load_image("key.png", (40, 40))
+        piece_img = self.load_image("puzzle_piece.png", (40, 40))
+
+        # Obtener acciones disponibles e items recolectados
         self.available_actions = self.state.get_available_actions()
         collected_items = self.state.get_collected_items()
-        print("actions", self.available_actions)
-        # Add action buttons
-        print(collected_items)
+
+        # Filtrar objetos disponibles - solo mostrar los que no están recolectados
+        available_pick_keys = set()
+        available_pick_pieces = set()
+        available_objects = set()
+        
+        for action in self.available_actions:
+            action_type, action_target = action.split(":")
+            if action_type == "pick_key" and action_target not in collected_items["keys"]:
+                available_pick_keys.add(action_target)
+            elif action_type == "pick_piece" and action_target not in collected_items["pieces"]:
+                available_pick_pieces.add(action_target)
+            elif action_type == "move_object":
+                available_objects.add(action_target)
+
+        # Filtrar llaves, piezas y objetos disponibles
+        filtered_keys = [k for k in self.keys if k in available_pick_keys]
+        filtered_pieces = [(p, puz) for (p, puz) in self.pieces if p in available_pick_pieces]
+        filtered_objects = [obj for obj in self.objects if obj in available_objects]
+
+        # Calcular o mantener posiciones existentes solo para objetos no recolectados
+        self.update_object_positions(filtered_keys, filtered_pieces, filtered_objects)
+
+        # Agregar botones de llaves (solo las no recolectadas)
+        for key in filtered_keys:
+            pos = self.object_positions.get(key, (0, 0))
+            if not any(isinstance(btn, ImageButton) and getattr(btn, 'tooltip', '').endswith(key) for btn in self.buttons):
+                self.buttons.append(ImageButton(
+                    pos[0], pos[1], key_img, 
+                    lambda k=key: self.safe_pick_key(k),
+                    tooltip=f"Recoger llave {key}"
+                ))
+
+        # Agregar botones de piezas (solo las no recolectadas)
+        for piece, puzzle in filtered_pieces:
+            pos = self.object_positions.get(piece, (0, 0))
+            if not any(isinstance(btn, ImageButton) and getattr(btn, 'tooltip', '').endswith(piece) for btn in self.buttons):
+                self.buttons.append(ImageButton(
+                    pos[0], pos[1], piece_img,
+                    lambda p=piece: self.safe_pick_piece(p),
+                    tooltip=f"Recoger pieza {piece} (Puzzle {puzzle})"
+                ))
+
+        # Agregar botones de objetos (solo los no interactuados)
+        for obj in filtered_objects:
+            pos = self.object_positions.get(obj, (0, 0))
+            obj_img = self.get_object_image(obj)
+            if not any(isinstance(btn, ImageButton) and getattr(btn, 'tooltip', '').endswith(obj) for btn in self.buttons):
+                self.buttons.append(ImageButton(
+                    pos[0], pos[1], obj_img,
+                    lambda o=obj: self.move_object(o),
+                    tooltip=f"Interactuar con {obj}"
+                ))
+
+        # Agregar botones de otras acciones (movimiento, resolver puzzles, etc.)
         y_pos = MARGIN
         for action in self.available_actions:
             action_type, action_target = action.split(":")
-            print("accion", action_type)
-            print("object", action_target)
-            if action_type == "pick_key" and action_target in collected_items["keys"]:
+            # Omitir acciones que ya manejamos con ImageButton
+            if action_type in ["pick_key", "pick_piece", "move_object"]:
                 continue
-            if (
-                action_type == "pick_piece"
-                and action_target in collected_items["pieces"]
-            ):
-                continue
-            btn_text = f"{action_type.replace('_', ' ').title()}: {action_target}"
 
-            # Shorten long button text
+            btn_text = f"{action_type.replace('_', ' ').title()}: {action_target}"
             if len(btn_text) > 20:
                 btn_text = f"{action_type.replace('_', ' ').title()}"
 
@@ -423,6 +571,78 @@ class EscapeRoomGUI:
                 )
             )
             y_pos += BUTTON_HEIGHT + MARGIN
+
+    def update_object_positions(self, keys, pieces, objects):
+        """Actualiza o asigna posiciones a los objetos manteniendo las existentes"""
+        all_objects = keys + [p[0] for p in pieces] + objects  # Nombres de todos los objetos
+        
+        # Limpiar posiciones de objetos que ya no están (incluyendo los recolectados)
+        for obj in list(self.object_positions.keys()):
+            if obj not in all_objects:
+                del self.object_positions[obj]
+        
+        # Asignar nuevas posiciones solo a objetos no recolectados
+        perimeter_positions = self.calculate_perimeter_positions(len(all_objects))
+        
+        # Asignar posiciones en orden
+        for i, obj in enumerate(all_objects):
+            if obj not in self.object_positions:
+                self.object_positions[obj] = perimeter_positions[i]
+
+    def calculate_perimeter_positions(self, num_items):
+        """Calculate non-overlapping positions around the room perimeter with configurable corners"""
+        positions = []
+        margin = 170  # Distance from screen edges
+        spacing = 60  # Minimum space between items
+
+        # Define the four edges with their movement logic
+        edges = [
+            {
+                "name": "top",
+                "start": (margin, 500),
+                "direction": (1, 0),  # Move right
+                "length": SCREEN_WIDTH - 2 * margin
+            },
+            {
+                "name": "right",
+                "start": (SCREEN_WIDTH - margin, margin),
+                "direction": (0, 1),  # Move down
+                "length": SCREEN_HEIGHT - 2 * margin
+            },
+            {
+                "name": "bottom",
+                "start": (SCREEN_WIDTH - margin, SCREEN_HEIGHT - margin),
+                "direction": (-1, 0),  # Move left
+                "length": SCREEN_WIDTH - 2 * margin
+            },
+            {
+                "name": "left",
+                "start": (margin, SCREEN_HEIGHT - margin),
+                "direction": (0, -1),  # Move up
+                "length": SCREEN_HEIGHT - 2 * margin
+            }
+        ]
+
+        for edge in edges:
+            if num_items <= 0:
+                break
+
+            max_items = max(0, min(num_items, edge["length"] // spacing))
+            if max_items == 0:
+                continue
+
+            dx, dy = edge["direction"]
+            step = edge["length"] // max(1, max_items - 1)
+
+            for i in range(max_items):
+                x = edge["start"][0] + i * step * dx
+                y = edge["start"][1] + i * step * dy
+                positions.append((x, y))
+
+            num_items -= max_items
+
+        return positions
+
 
     def handle_action(self, action_str):
         """Handle a game action"""
@@ -492,9 +712,7 @@ class EscapeRoomGUI:
 
         # Check win condition
         if self.state.check_win_condition():
-            self.add_output("\nCONGRATULATIONS! You've escaped the room!")
-            self.add_output("Game Over - You Win!")
-            self.game_initialized = False
+            self.game_over_screen(True)
 
         # Update action buttons
         self.update_action_buttons()
@@ -506,6 +724,7 @@ class EscapeRoomGUI:
 
     def add_output(self, text, center=False, indent=0):
         """Add text to the output display, optionally centered or indented"""
+        self.clear_outputs()
         max_chars = (SCREEN_WIDTH - 2 * MARGIN) // (FONT_SIZE // 2)
         lines = []
 
@@ -639,18 +858,14 @@ class EscapeRoomGUI:
         if self.state.move_player(new_room):
             # Check if new room has trap
             if not self.constraints.check_trap(new_room):
-                self.add_output(f"\nTRAP ACTIVATED in room {new_room}! Game Over!")
-                self.game_initialized = False
+                self.game_over_screen(False, f"Activaste una trampa en el piso {new_room}")
                 return
 
             # Check move limit
             if not self.constraints.check_move_limit():
-                self.add_output("\nMOVE LIMIT REACHED! Game Over!")
-                self.game_initialized = False
+                self.game_over_screen(False, "Excediste el límite de movimientos")
                 return
-
             # In adversary mode, move the guard
-
             self.add_output(f"\nMoved to room {new_room}.")
         else:
             self.add_output(f"\nCannot move to room {new_room}.")
@@ -660,6 +875,10 @@ class EscapeRoomGUI:
         if self.constraints.check_inventory_limit("key"):
             if self.state.pick_key(key):
                 self.add_output(f"\nPicked up key: {key}")
+                # Actualizar botones inmediatamente
+                self.update_action_buttons()
+                # Forzar redibujado
+                pygame.display.flip()
             else:
                 self.add_output(f"\nCannot pick up key: {key}")
         else:
@@ -672,6 +891,10 @@ class EscapeRoomGUI:
         if self.constraints.check_inventory_limit("piece"):
             if self.state.pick_piece(piece):
                 self.add_output(f"\nPicked up puzzle piece: {piece}")
+                # Actualizar botones inmediatamente
+                self.update_action_buttons()
+                # Forzar redibujado
+                pygame.display.flip()
             else:
                 self.add_output(f"\nCannot pick up piece: {piece}")
         else:
@@ -694,6 +917,9 @@ class EscapeRoomGUI:
                 self.add_output(
                     f"Found hidden puzzle piece: {piece} (of puzzle {puzzle})"
                 )
+                self.update_action_buttons()
+                # Forzar redibujado
+                pygame.display.flip()
         else:
             self.add_output(f"\nCannot examine object: {obj}")
 
@@ -710,6 +936,35 @@ class EscapeRoomGUI:
             self.add_output(f"\nUnlocked door between {from_room} and {to_room}")
         else:
             self.add_output(f"\nCannot unlock door between {from_room} and {to_room}")
+
+    def game_over_screen(self, won, reason=None):
+        """Muestra la pantalla de fin de juego"""
+        self.available_actions = []
+        self.clear_outputs()
+        self.clear_all = True
+        self.game_initialized = False
+        
+        if won:
+            self.add_output("¡FELICIDADES!", center=True)
+            self.add_output("Has escapado exitosamente", center=True)
+            self.add_output("¡GANASTE EL JUEGO!", center=True)
+        else:
+            self.add_output("GAME OVER", center=True)
+            self.add_output("No lograste escapar", center=True)
+            if reason:
+                self.add_output(f"{reason}", center=True)
+        
+        # Botones
+
+        
+        # Reproducir sonido de victoria/derrota
+        try:
+            if won:
+                pygame.mixer.Sound("win_sound.wav").play()
+            else:
+                pygame.mixer.Sound("lose_sound.wav").play()
+        except:
+            pass  # Si no hay sonidos, continuar sin ellos
 
     def run(self):
         """Main game loop"""
@@ -771,18 +1026,32 @@ class EscapeRoomGUI:
                 self.cinematic.update_intro()
 
             # Dibujar todo
-            self.screen.fill(WHITE)
+            self.screen.fill(BLACK)
 
             if not self.cinematic.intro_completed:
                 self.cinematic.draw_intro()
             else:
+                if self.game_initialized and self.background:
+                    self.screen.blit(self.background, (0, 0))
                 # Dibujar texto del juego
-                y_pos = MARGIN - self.scroll_position
-                for i, line in enumerate(self.output_text):
-                    if MARGIN <= y_pos <= SCREEN_HEIGHT - MARGIN:
-                        text_surface = self.font.render(line, True, BLACK)
-                        self.screen.blit(text_surface, (MARGIN, y_pos))
-                    y_pos += FONT_SIZE + 4
+                if not self.game_initialized and len(self.output_text) == 0:
+                    # Dibujar logo o título alternativo
+                    if self.logo:
+                        logo_rect = self.logo.get_rect(center=(SCREEN_WIDTH//2, 150))
+                        self.screen.blit(self.logo, logo_rect)
+                    else:
+                        title = self.large_font.render("ESCAPE ROOM GAME", True, WHITE)
+                        title_rect = title.get_rect(center=(SCREEN_WIDTH//2, 150))
+                        self.screen.blit(title, title_rect)
+     
+                else:
+                    # Dibujar texto del juego normal
+                    y_pos = MARGIN - self.scroll_position
+                    for i, line in enumerate(self.output_text):
+                        if MARGIN <= y_pos <= SCREEN_HEIGHT - MARGIN:
+                            text_surface = self.font.render(line, True, WHITE)
+                            self.screen.blit(text_surface, (MARGIN, y_pos))
+                        y_pos += FONT_SIZE + 4
 
                 # Dibujar mapa si está activado
                 if hasattr(self, "show_map") and self.show_map:
@@ -803,45 +1072,211 @@ class EscapeRoomGUI:
         sys.exit()
 
     def draw_help(self):
-        """Draw help overlay"""
+        """Draw help overlay with solution buttons and results, organizing text in columns if needed"""
         # Semi-transparent overlay
         s = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
         s.fill((0, 0, 0, 180))
         self.screen.blit(s, (0, 0))
 
-        # Help text
-        help_text = [
-            "Available commands:",
-            "- Inventory: View your collected items",
-            "- Game Stats: View game constraints and limits",
-            "- Find Solution: Calculate escape path (may take time)",
-            "",
-            "Room Actions:",
-            "- Move To: Move to another room",
-            "- Pick Key: Collect a key",
-            "- Pick Piece: Collect a puzzle piece",
-            "- Move Object: Examine an object",
-            "- Solve Puzzle: Solve a puzzle with collected pieces",
-            "- Unlock Door: Unlock a door with the right key",
-            "",
-            "Press H to close help",
-        ]
-
-        # Draw help box
+        # Help box dimensions
         help_width = SCREEN_WIDTH - 200
         help_height = SCREEN_HEIGHT - 200
         pygame.draw.rect(self.screen, WHITE, (100, 100, help_width, help_height))
         pygame.draw.rect(self.screen, BLUE, (100, 100, help_width, help_height), 3)
 
-        # Draw help text
-        y_pos = 120
-        for line in help_text:
-            text_surface = self.font.render(line, True, BLACK)
-            self.screen.blit(text_surface, (120, y_pos))
-            y_pos += FONT_SIZE + 4
+        # Title
+        title = self.font.render("HELP - SOLUTION FINDERS", True, BLACK)
+        self.screen.blit(title, (help_width//2 - title.get_width()//2 + 100, 120))
+
+        # Solution buttons in a row
+        solution_buttons = [
+            Button(
+                help_width//4 + 80,
+                180,
+                BUTTON_WIDTH - 40,
+                BUTTON_HEIGHT - 10,
+                "BFS Solution",
+                lambda: self.solver.find_solution(show_in_help=True),
+                bg_color=GREEN,
+                text_color=BLACK
+            ),
+            Button(
+                help_width//2 + 80,
+                180,
+                BUTTON_WIDTH - 40,
+                BUTTON_HEIGHT - 10,
+                "BFS No Cons",
+                lambda: self.solver.find_solution_no(show_in_help=True),
+                bg_color=YELLOW,
+                text_color=BLACK
+            ),
+            Button(
+                3*help_width//4 + 80,
+                180,
+                BUTTON_WIDTH - 40,
+                BUTTON_HEIGHT - 10,
+                "A* Solution",
+                lambda: self.solver.find_solution_start(show_in_help=True),
+                bg_color=RED,
+                text_color=WHITE
+            )
+        ]
+
+        # Draw buttons
+        mouse_pos = pygame.mouse.get_pos()
+        mouse_clicked = pygame.mouse.get_pressed()[0]
+        
+        for button in solution_buttons:
+            button.draw(self.screen)
+            if mouse_clicked and button.is_clicked(mouse_pos):
+                button.action()
+
+        # Solution display area
+        solution_box_y = 230
+        solution_box_height = help_height - 130
+        pygame.draw.rect(
+            self.screen, 
+            LIGHT_GRAY, 
+            (120, solution_box_y, help_width-40, solution_box_height)
+        )
+        pygame.draw.rect(
+            self.screen, 
+            DARK_GRAY, 
+            (120, solution_box_y, help_width-40, solution_box_height), 
+            2
+        )
+
+        # Draw solution text if available
+        if hasattr(self, 'help_solution_text') and self.help_solution_text:
+            # Calculate how many lines fit in the box
+            line_height = FONT_SIZE - 2
+            max_lines = solution_box_height // line_height
+            
+            # Calculate how many columns we need
+            total_lines = len(self.help_solution_text)
+            columns_needed = (total_lines + max_lines - 1) // max_lines
+            
+            # Calculate column width (with minimum width)
+            column_width = max(200, (help_width - 60) // columns_needed)
+            
+            # Draw text in columns
+            current_column = 0
+            current_line = 0
+            
+            for i, line in enumerate(self.help_solution_text):
+                if i >= (current_column + 1) * max_lines:
+                    current_column += 1
+                    current_line = 0
+                
+                x_pos = 130 + (current_column * column_width)
+                y_pos = solution_box_y + 10 + (current_line * line_height)
+                
+                if y_pos + line_height <= solution_box_y + solution_box_height:
+                    text_surface = self.small_font.render(line, True, BLACK)
+                    self.screen.blit(text_surface, (x_pos, y_pos))
+                
+                current_line += 1
+
+    def add_help_output(self, text):
+        """Add text to the help modal output"""
+        if not hasattr(self, 'help_solution_text'):
+            self.help_solution_text = []
+        
+        # Split long text into multiple lines
+        max_chars = (SCREEN_WIDTH - 250) // (FONT_SIZE // 2)
+        if len(text) > max_chars:
+            words = text.split()
+            current_line = ""
+            for word in words:
+                if len(current_line) + len(word) + 1 <= max_chars:
+                    current_line += " " + word
+                else:
+                    self.help_solution_text.append(current_line.strip())
+                    current_line = word
+            if current_line:
+                self.help_solution_text.append(current_line.strip())
+        else:
+            self.help_solution_text.append(text)
+    def show_solution_in_help(self, algorithm_type):
+        """Calculate and display solution within the help modal"""
+        # Clear previous solution
+        self.help_solution_text = ["Calculating solution..."]
+        
+        # Force immediate redraw
+        pygame.display.flip()
+        
+        # Calculate solution based on algorithm type
+        if algorithm_type == "BFS":
+            solution = self.solver.find_solution()
+        elif algorithm_type == "BFS No Constraints":
+            solution = self.solver.find_solution_no()
+        elif algorithm_type == "A*":
+            solution = self.solver.find_solution_start()
+        
+        # Process solution text
+        if solution:
+            self.help_solution_text = [
+                f"{algorithm_type} Solution Found:",
+                "-----------------------------"
+            ]
+            if isinstance(solution, list):
+                self.help_solution_text.extend(solution)
+            else:
+                self.help_solution_text.append(str(solution))
+        else:
+            self.help_solution_text = ["No solution found with current constraints."]
+
+class ImageButton:
+    def __init__(self, x, y, image, action, tooltip=""):
+        self.image = image
+        self.rect = self.image.get_rect(center=(x, y))
+        self.action = action
+        self.tooltip = tooltip
+        self.show_tooltip = False
+        
+        # Cargar sonido de clic
+        try:
+            self.click_sound = pygame.mixer.Sound("assets/sounds/click.mp3")
+        except:
+            self.click_sound = None
+
+    def draw(self, surface):
+        """Draw the image button"""
+        surface.blit(self.image, self.rect)
+        
+        # Mostrar tooltip si está hover
+        mouse_pos = pygame.mouse.get_pos()
+        self.show_tooltip = self.rect.collidepoint(mouse_pos)
+        
+        if self.show_tooltip and self.tooltip:
+            # Crear superficie para el tooltip
+            font = pygame.font.SysFont("Arial", 16)
+            text_surface = font.render(self.tooltip, True, WHITE)
+            
+            # Fondo del tooltip
+            tooltip_rect = text_surface.get_rect()
+            tooltip_rect.centerx = self.rect.centerx
+            tooltip_rect.bottom = self.rect.top - 5
+            pygame.draw.rect(surface, (50, 50, 50), tooltip_rect.inflate(10, 5))
+            pygame.draw.rect(surface, WHITE, tooltip_rect.inflate(10, 5), 1)
+            
+            # Dibujar texto
+            surface.blit(text_surface, tooltip_rect)
+
+    def is_clicked(self, pos, event=None):
+        """Check if image was clicked and play sound"""
+        clicked = self.rect.collidepoint(pos)
+        if clicked:
+            if self.click_sound:
+                self.click_sound.play()
+            if callable(self.action):
+                self.action()
+        return clicked
 
 # Main entry point
 if __name__ == "__main__":
     bridge = PrologBridge()
     game = EscapeRoomGUI(bridge)
     game.run()
+
+
