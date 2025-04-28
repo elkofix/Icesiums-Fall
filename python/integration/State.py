@@ -91,7 +91,20 @@ class StateManager:
 
     def solve_puzzle(self, puzzle):
         """Solve a puzzle"""
-        return bool(list(self.prolog.query(f"state:solve_puzzle({puzzle})")))
+        query = f"""
+                with_output_to(
+                    codes(Codes),
+                    state:solve_puzzle({puzzle})
+                ),
+                atom_codes(Output, Codes)
+            """
+        result = list(self.prolog.query(query))[0]['Output']
+        result = result.strip()  # Elimina espacios y saltos de línea    
+        print("puzz", result)    
+        if "Congratulations" in result or "already" in result:
+            return True
+        else:
+            return False
 
     def unlock_door(self, from_room, to_room):
         """Unlock a door between rooms"""
@@ -105,6 +118,7 @@ class StateManager:
         result = list(self.prolog.query(query))[0]['Output']
         result = result.strip()  # Elimina espacios y saltos de línea        
         # Verificamos si el resultado contiene "has been unlocked"
+        print("resultaopuer",result)
         if "has been unlocked" in result:
             return True
         else:

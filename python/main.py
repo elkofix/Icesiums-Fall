@@ -78,6 +78,40 @@ class EscapeRoomGUI:
         self.load_background()
         self.object_images = {}  # Diccionario para almacenar imágenes de objetos
         self.load_object_images()  # Cargar imágenes de objetos al inicializar
+        self.door_images = {
+            "locked": None,
+            "unlocked": None
+        }
+        self.load_door_images()
+        
+    def load_door_images(self):
+        """Cargar imágenes para puertas bloqueadas y desbloqueadas"""
+        try:
+            locked_path = os.path.join("assets", "images", "locked.png")
+            unlocked_path = os.path.join("assets", "images", "unlocked.png")
+            
+            if os.path.exists(locked_path):
+                img = pygame.image.load(locked_path).convert_alpha()
+                self.door_images["locked"] = pygame.transform.scale(img, (60, 100))
+            
+            if os.path.exists(unlocked_path):
+                img = pygame.image.load(unlocked_path).convert_alpha()
+                self.door_images["unlocked"] = pygame.transform.scale(img, (60, 100))
+        except Exception as e:
+            print(f"Error cargando imágenes de puertas: {e}")
+            # Crear placeholders si falla la carga
+            self.door_images["locked"] = self.create_door_placeholder("BLOQUEADA", RED)
+            self.door_images["unlocked"] = self.create_door_placeholder("ABIERTA", GREEN)
+    
+    def create_door_placeholder(self, text, color):
+        """Crear una imagen de placeholder para puertas"""
+        surface = pygame.Surface((60, 100), pygame.SRCALPHA)
+        pygame.draw.rect(surface, color, (0, 0, 60, 100))
+        pygame.draw.rect(surface, BLACK, (0, 0, 60, 100), 2)
+        font = pygame.font.SysFont("Arial", 12)
+        text_surf = font.render(text, True, BLACK)
+        surface.blit(text_surf, (30 - text_surf.get_width()//2, 50 - text_surf.get_height()//2))
+        return surface
 
     def load_object_images(self):
         """Cargar imágenes para los objetos disponibles"""
@@ -86,7 +120,8 @@ class EscapeRoomGUI:
             "cabinet": "cabinet.png",
             "box": "box.png",
             "bookshelf": "bookshelf.png",
-            "rug": "rug.png"
+            "rug": "rug.png",
+            "puzzle": "puzzles.png"
         }
         
         for obj_name, filename in object_image_files.items():
@@ -369,7 +404,7 @@ class EscapeRoomGUI:
         self.update_action_buttons()
 
     def draw_map(self):
-        """Dibuja el mapa usando NetworkX con una solución robusta para Pygame"""
+        """Dibuja el mapa pequeño en la esquina superior derecha con fondo negro transparente"""
         if not hasattr(self, "map") or not self.map:
             return
 
@@ -379,13 +414,17 @@ class EscapeRoomGUI:
             import io
             from PIL import Image
         except ImportError:
-            print(
-                "Advertencia: NetworkX/Matplotlib no instalados. No se dibujará el mapa."
-            )
+            print("Advertencia: NetworkX/Matplotlib no instalados. No se dibujará el mapa.")
             return
 
+        # Obtener la habitación final (salida)
+        final_room = self.facts.get_final_room()
+        
+        # Marcar la habitación actual y la final
         for node in self.map["nodes"]:
             node["is_current"] = node["id"] == self.state.player_location()
+            node["is_final"] = node["id"] == final_room
+
         # Crear el grafo
         G = nx.DiGraph()
 
@@ -395,52 +434,101 @@ class EscapeRoomGUI:
         for link in self.map["links"]:
             G.add_edge(link["source"], link["target"], **link)
 
-        # Configurar la figura
-        fig, ax = plt.subplots(figsize=(10, 6), facecolor="#1a1a2e")
+        # Configurar la figura con fondo transparente
+        fig, ax = plt.subplots(figsize=(4, 3), facecolor='none')
         pos = nx.spring_layout(G, seed=42)
 
         # Personalizar nodos
         node_colors = []
         for node in G.nodes():
             if G.nodes[node].get("is_current", False):
-                node_colors.append("#4cc9f0")  # Habitación actual
+                node_colors.append("#4cc9f0")  # Habitación actual - azul claro
+            elif G.nodes[node].get("is_final", False):
+                node_colors.append("#ff0000")  # Habitación final - rojo brillante
             elif G.nodes[node].get("has_guard", False):
-                node_colors.append("#f72585")  # Con guardia
+                node_colors.append("#f72585")  # Con guardia - rosa
             else:
-                node_colors.append("#4361ee")  # Normal
+                node_colors.append("#4361ee")  # Normal - azul
 
         # Dibujar el grafo
-        nx.draw_networkx_nodes(G, pos, node_color=node_colors, node_size=1500, ax=ax)
-        nx.draw_networkx_labels(G, pos, font_color="white", ax=ax)
+        nx.draw_networkx_nodes(
+            G, pos, 
+            node_color=node_colors, 
+            node_size=400,
+            ax=ax,
+            edgecolors='white',
+            linewidths=1
+        )
+        
+        # Etiquetas con estilo especial para la habitación final
+        node_labels = {}
+        for node in G.nodes():
+            if G.nodes[node].get("is_final", False):
+                node_labels[node] = f"{node}\n(SALIDA)"
+            else:
+                node_labels[node] = node
+        
+        nx.draw_networkx_labels(
+            G, pos, 
+            labels=node_labels,
+            font_color='white', 
+            font_size=8,
+            ax=ax
+        )
 
         # Personalizar aristas
         edge_colors = []
         for u, v in G.edges():
             if G.edges[u, v].get("state", "") == "locked":
-                edge_colors.append("#ff9e00")  # Cerrada
+                edge_colors.append("#ff9e00")  # Cerrada - naranja
             else:
-                edge_colors.append("#4ad66d")  # Abierta
+                edge_colors.append("#4ad66d")  # Abierta - verde
 
         nx.draw_networkx_edges(
-            G, pos, edge_color=edge_colors, width=2, arrows=True, ax=ax
+            G, pos, 
+            edge_color=edge_colors, 
+            width=1.5,
+            arrows=True, 
+            arrowsize=8,
+            ax=ax
         )
+
+        # Configurar el fondo del gráfico como transparente
+        ax.set_facecolor('none')
+        fig.patch.set_alpha(0)
+        ax.axis('off')
+        plt.tight_layout()
 
         # Convertir a imagen compatible con Pygame
         buf = io.BytesIO()
-        plt.savefig(buf, format="png", bbox_inches="tight", pad_inches=0, dpi=100)
+        plt.savefig(
+            buf, 
+            format="png", 
+            bbox_inches='tight', 
+            pad_inches=0, 
+            dpi=100,
+            transparent=True
+        )
         buf.seek(0)
 
         # Usar PIL para cargar la imagen y luego convertir a Pygame
         img = Image.open(buf)
-        img = img.resize((int(SCREEN_WIDTH * 0.8), int(SCREEN_HEIGHT * 0.7)))
-        mode = img.mode
-        size = img.size
-        data = img.tobytes()
+        img = img.resize((250, 200))
+        
+        # Crear superficie con alpha para el fondo oscuro semitransparente
+        map_surface = pygame.Surface((250, 200), pygame.SRCALPHA)
+        map_surface.fill((0, 0, 0, 180))  # Negro con 70% de opacidad
+        
+        # Pegar el mapa en la superficie
+        map_data = img.tobytes()
+        pygame_img = pygame.image.fromstring(map_data, img.size, img.mode)
+        map_surface.blit(pygame_img, (0, 0))
 
-        pygame_img = pygame.image.fromstring(data, size, mode)
+        # Dibujar leyenda simple
+        font = pygame.font.SysFont("Arial", 12)
 
-        # Dibujar en la pantalla
-        self.screen.blit(pygame_img, (SCREEN_WIDTH * 0.1, SCREEN_HEIGHT * 0.15))
+        # Dibujar en la esquina superior derecha de la pantalla
+        self.screen.blit(map_surface, (SCREEN_WIDTH - 260, 20))
 
         # Limpiar
         plt.close(fig)
@@ -480,6 +568,18 @@ class EscapeRoomGUI:
     def update_action_buttons(self):
         """Update buttons for current room actions"""
         # Limpiar botones existentes (excepto los principales como "New Game")
+        if self.clear_all:
+            self.buttons = [            
+                Button(
+                SCREEN_WIDTH - BUTTON_WIDTH - MARGIN,
+                SCREEN_HEIGHT - BUTTON_HEIGHT - MARGIN,
+                BUTTON_WIDTH,
+                BUTTON_HEIGHT,
+                "New Game",
+                self.start_screen,
+            ),]
+            return
+        
         self.buttons = [
             btn for btn in self.buttons if not isinstance(btn, ImageButton) 
         ]
@@ -490,6 +590,7 @@ class EscapeRoomGUI:
         # Cargar imágenes
         key_img = self.load_image("key.png", (40, 40))
         piece_img = self.load_image("puzzle_piece.png", (40, 40))
+        puzzle_img = self.load_image("puzzles.png", (60, 60))  # Imagen para resolver puzzles
 
         # Obtener acciones disponibles e items recolectados
         self.available_actions = self.state.get_available_actions()
@@ -499,7 +600,9 @@ class EscapeRoomGUI:
         available_pick_keys = set()
         available_pick_pieces = set()
         available_objects = set()
-        
+        available_solve_puzzles = set()
+
+
         for action in self.available_actions:
             action_type, action_target = action.split(":")
             if action_type == "pick_key" and action_target not in collected_items["keys"]:
@@ -508,14 +611,21 @@ class EscapeRoomGUI:
                 available_pick_pieces.add(action_target)
             elif action_type == "move_object":
                 available_objects.add(action_target)
+            elif action_type == "solve_puzzle":
+                available_solve_puzzles.add(action_target)
 
         # Filtrar llaves, piezas y objetos disponibles
         filtered_keys = [k for k in self.keys if k in available_pick_keys]
         filtered_pieces = [(p, puz) for (p, puz) in self.pieces if p in available_pick_pieces]
         filtered_objects = [obj for obj in self.objects if obj in available_objects]
+        filtered_puzzles = [puz for puz in available_solve_puzzles]
 
-        # Calcular o mantener posiciones existentes solo para objetos no recolectados
-        self.update_object_positions(filtered_keys, filtered_pieces, filtered_objects)
+        # Ca    lcular posiciones para todos los elementos
+        all_items = filtered_keys + [p[0] for p in filtered_pieces] + filtered_objects + filtered_puzzles
+        perimeter_positions = self.calculate_perimeter_positions(len(all_items))
+
+        # Asignar posiciones
+        self.update_object_positions(filtered_keys, filtered_pieces, filtered_objects, filtered_puzzles)
 
         # Agregar botones de llaves (solo las no recolectadas)
         for key in filtered_keys:
@@ -527,56 +637,92 @@ class EscapeRoomGUI:
                     tooltip=f"Recoger llave {key}"
                 ))
 
-        # Agregar botones de piezas (solo las no recolectadas)
-        for piece, puzzle in filtered_pieces:
-            pos = self.object_positions.get(piece, (0, 0))
-            if not any(isinstance(btn, ImageButton) and getattr(btn, 'tooltip', '').endswith(piece) for btn in self.buttons):
-                self.buttons.append(ImageButton(
-                    pos[0], pos[1], piece_img,
-                    lambda p=piece: self.safe_pick_piece(p),
-                    tooltip=f"Recoger pieza {piece} (Puzzle {puzzle})"
-                ))
 
-        # Agregar botones de objetos (solo los no interactuados)
-        for obj in filtered_objects:
-            pos = self.object_positions.get(obj, (0, 0))
+        # Agregar botones de piezas
+        offset = len(filtered_keys)
+        for i, (piece, puzzle) in enumerate(filtered_pieces):
+            pos = self.object_positions.get(piece, perimeter_positions[offset + i] if offset + i < len(perimeter_positions) else (0, 0))
+            self.buttons.append(ImageButton(
+                pos[0], pos[1], piece_img,
+                lambda p=piece: self.safe_pick_piece(p),
+                tooltip=f"Recoger pieza {piece} (Puzzle {puzzle})"
+            ))
+
+        # Agregar botones de objetos
+        offset += len(filtered_pieces)
+        for i, obj in enumerate(filtered_objects):
+            pos = self.object_positions.get(obj, perimeter_positions[offset + i] if offset + i < len(perimeter_positions) else (0, 0))
             obj_img = self.get_object_image(obj)
-            if not any(isinstance(btn, ImageButton) and getattr(btn, 'tooltip', '').endswith(obj) for btn in self.buttons):
-                self.buttons.append(ImageButton(
-                    pos[0], pos[1], obj_img,
-                    lambda o=obj: self.move_object(o),
-                    tooltip=f"Interactuar con {obj}"
-                ))
+            self.buttons.append(ImageButton(
+                pos[0], pos[1], obj_img,
+                lambda o=obj: self.move_object(o),
+                tooltip=f"Interactuar con {obj}"
+            ))
 
-        # Agregar botones de otras acciones (movimiento, resolver puzzles, etc.)
-        y_pos = MARGIN
+        # Agregar botones de puzzles
+        offset += len(filtered_objects)
+        for i, puzzle in enumerate(filtered_puzzles):
+            pos = self.object_positions.get(puzzle, perimeter_positions[offset + i] if offset + i < len(perimeter_positions) else (0, 0))
+            self.buttons.append(ImageButton(
+                pos[0], pos[1], puzzle_img,
+                lambda p=puzzle: self.solve_puzzle(p),
+                tooltip=f"Resolver puzzle {puzzle}"
+            ))
+
+        # Obtener puertas disponibles
+        available_doors = []
         for action in self.available_actions:
             action_type, action_target = action.split(":")
-            # Omitir acciones que ya manejamos con ImageButton
-            if action_type in ["pick_key", "pick_piece", "move_object"]:
-                continue
+            if action_type == "unlock_door":
+                from_room = self.state.player_location()
+                to_room = action_target
+                available_doors.append((from_room, to_room))
+            elif action_type == "move_to":
+                # También considerar puertas ya desbloqueadas como movimientos
+                for door in self.doors:
+                    if (door["from"] == self.current_room and door["to"] == action_target) or \
+                       (door["from"] == action_target and door["to"] == self.current_room):
+                        if door["state"] == "unlocked":
+                            available_doors.append((self.current_room, action_target))
 
-            btn_text = f"{action_type.replace('_', ' ').title()}: {action_target}"
-            if len(btn_text) > 20:
-                btn_text = f"{action_type.replace('_', ' ').title()}"
-
-            self.buttons.append(
-                Button(
-                    SCREEN_WIDTH - BUTTON_WIDTH - MARGIN,
-                    y_pos,
-                    BUTTON_WIDTH,
-                    BUTTON_HEIGHT,
-                    btn_text,
-                    lambda a=action: self.handle_action(a),
-                )
-            )
-            y_pos += BUTTON_HEIGHT + MARGIN
-
-    def update_object_positions(self, keys, pieces, objects):
-        """Actualiza o asigna posiciones a los objetos manteniendo las existentes"""
-        all_objects = keys + [p[0] for p in pieces] + objects  # Nombres de todos los objetos
+        # Calcular posiciones de puertas
+        self.update_door_positions(available_doors)
         
-        # Limpiar posiciones de objetos que ya no están (incluyendo los recolectados)
+        # Añadir botones de puertas
+        for from_room, to_room in available_doors:
+            pos = self.door_positions.get((from_room, to_room), (0, 0))
+            
+            # Determinar estado de la puerta
+            door_state = "locked"
+            for door in self.doors:
+                if (door["from"] == from_room and door["to"] == to_room) or \
+                   (door["from"] == to_room and door["to"] == from_room):
+                    door_state = door["state"]
+                    break
+            
+            # Determinar acción según estado
+            if door_state == "locked":
+                action = lambda f=from_room, t=to_room: self.handle_door_action(f, t)
+                tooltip = f"Puerta {from_room}-{to_room} (Bloqueada - Click para desbloquear)"
+            else:
+                action = lambda f=from_room, t=to_room: self.move_player(t)
+                tooltip = f"Puerta {from_room}-{to_room} (Abierta - Click para pasar)"
+            
+            door_img = self.door_images[door_state]
+            
+            self.buttons.append(ImageButton(
+                pos[0], pos[1], door_img,
+                action,
+                tooltip=tooltip
+            ))
+
+
+    def update_object_positions(self, keys, pieces, objects, puzzles=None):
+        """Actualiza o asigna posiciones a los objetos manteniendo las existentes"""
+        puzzles = puzzles or []
+        all_objects = keys + [p[0] for p in pieces] + objects + puzzles
+        
+        # Limpiar posiciones de objetos que ya no están
         for obj in list(self.object_positions.keys()):
             if obj not in all_objects:
                 del self.object_positions[obj]
@@ -588,6 +734,60 @@ class EscapeRoomGUI:
         for i, obj in enumerate(all_objects):
             if obj not in self.object_positions:
                 self.object_positions[obj] = perimeter_positions[i]
+
+    def handle_door_action(self, from_room, to_room):
+        """Manejar acción de puerta (desbloquear o pasar)"""
+        # Primero intentar desbloquear si está bloqueada
+        if not self.unlock_door(from_room, to_room):
+            # Si no se pudo desbloquear, intentar mover si ya está desbloqueada
+            for door in self.doors:
+                if (door["from"] == from_room and door["to"] == to_room) or \
+                   (door["from"] == to_room and door["to"] == from_room):
+                    if door["state"] == "unlocked":
+                        self.move_player(to_room)
+                    break
+
+    def update_door_positions(self, doors):
+        """Coloca todas las puertas en una sola fila horizontal"""
+        if not hasattr(self, 'door_positions'):
+            self.door_positions = {}
+            
+        new_positions = {}
+        
+        if not doors:
+            self.door_positions = new_positions
+            return
+
+        # Definir el área donde se pueden poner las puertas
+        margin_x = 100  # espacio a los lados
+        y_position = 450  # altura fija donde estarán todas las puertas
+        available_width = SCREEN_WIDTH - 2 * margin_x
+
+        step = available_width // (len(doors) + 1)  # espacio entre puertas
+
+        for i, door in enumerate(doors):
+            x = margin_x + (i + 1) * step
+            new_positions[door] = (x, y_position)
+
+        # Mantener posiciones anteriores si existe la puerta
+        for door, pos in self.door_positions.items():
+            if door in doors:
+                new_positions[door] = pos
+
+        self.door_positions = new_positions
+
+
+    def unlock_door(self, from_room, to_room):
+        """Desbloquear puerta de forma segura (con debounce de 300ms)"""
+        current_time = time.time()
+        if current_time - getattr(self, 'last_unlock_time', 0) > 0.3:  # 300ms de espera
+            self.last_unlock_time = current_time
+            if self.state.unlock_door(from_room, to_room):
+                self.add_output(f"\n¡Puerta entre {from_room} y {to_room} desbloqueada!")
+                self.update_game_state()
+                return True
+        return False
+
 
     def calculate_perimeter_positions(self, num_items):
         """Calculate non-overlapping positions around the room perimeter with configurable corners"""
@@ -854,21 +1054,34 @@ class EscapeRoomGUI:
                 )
 
     def move_player(self, new_room):
-        """Move player to a new room"""
-        if self.state.move_player(new_room):
-            # Check if new room has trap
-            if not self.constraints.check_trap(new_room):
-                self.game_over_screen(False, f"Activaste una trampa en el piso {new_room}")
-                return
+        """Mover jugador de forma segura (con debounce de 300ms)"""
+        current_time = time.time()
+        if current_time - getattr(self, 'last_move_time', 0) > 0.3:  # 300ms de espera
+            self.last_move_time = current_time
 
-            # Check move limit
-            if not self.constraints.check_move_limit():
-                self.game_over_screen(False, "Excediste el límite de movimientos")
-                return
-            # In adversary mode, move the guard
-            self.add_output(f"\nMoved to room {new_room}.")
-        else:
-            self.add_output(f"\nCannot move to room {new_room}.")
+            if self.state.move_player(new_room):
+                # Check if new room has trap
+                if not self.constraints.check_trap(new_room):
+                    self.game_over_screen(False, f"Activaste una trampa en el piso {new_room}")
+                    return
+
+                # Check move limit
+                if not self.constraints.check_move_limit():
+                    self.game_over_screen(False, "Excediste el límite de movimientos")
+                    return
+
+                if self.facts.get_game_mode() == "adversary":
+                    if self.state.player_location() == self.state.guard_location():
+                        self.game_over_screen(False, "El guardia esta contigo")
+                        return
+
+                self.add_output(f"\nMoved to room {new_room}.")
+                self.update_game_state()
+            else:
+                self.add_output(f"\nCannot move to room {new_room}.")
+        self.map = self.facts.get_json_map()
+
+
 
     def pick_key(self, key):
         """Pick up a key"""
@@ -932,16 +1145,21 @@ class EscapeRoomGUI:
 
     def unlock_door(self, from_room, to_room):
         """Unlock a door"""
+        print("fron", from_room)
+        print("tu", to_room)
         if self.state.unlock_door(from_room, to_room):
             self.add_output(f"\nUnlocked door between {from_room} and {to_room}")
         else:
             self.add_output(f"\nCannot unlock door between {from_room} and {to_room}")
+        self.update_game_state()
+
 
     def game_over_screen(self, won, reason=None):
         """Muestra la pantalla de fin de juego"""
         self.available_actions = []
         self.clear_outputs()
         self.clear_all = True
+        self.update_action_buttons()
         self.game_initialized = False
         
         if won:
