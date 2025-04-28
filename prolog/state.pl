@@ -244,6 +244,7 @@ drop_piece(Piece) :-
     format("No tienes la pieza ~w en tu inventario.~n", [Piece]).
 
 % Move an object to find hidden pieces
+% Move an object to find hidden pieces - versión mejorada
 move_object(Object) :-
     player_location(Room),
     facts:object_in_room(Room, Object),
@@ -252,10 +253,14 @@ move_object(Object) :-
     % Check if moving reveals a puzzle piece
     ( facts:hides_piece(Object, Puzzle, Piece) ->
         ( constraints:check_inventory_limit(piece) ->
+            % Si hay espacio, añadir al inventario
             assertz(has_piece(Puzzle, Piece)),
             format("You moved ~w and found piece ~w of puzzle ~w!~n", [Object, Piece, Puzzle])
         ;
-            format("You moved ~w and found piece ~w of puzzle ~w, but your inventory is full!~n", [Object, Piece, Puzzle])
+            % Si NO hay espacio, dejar la pieza visible en la habitación usando el predicado oficial
+            facts:add_visible_piece(Room, Piece, Puzzle),
+            format("You moved ~w and found piece ~w of puzzle ~w, but your inventory is full!~n", [Object, Piece, Puzzle]),
+            format("The piece ~w is now visible in room ~w. You can pick it up later.~n", [Piece, Room])
         )
     ;
         format("You moved ~w but found nothing interesting.~n", [Object])

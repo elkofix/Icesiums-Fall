@@ -265,6 +265,7 @@ guard_location :-
     facts:game_mode(adversary),
     adversary:guard_location(Room),
     format("El guardia está actualmente en la habitación ~w.~n", [Room]).
+    
 guard_location :-
     \+ facts:game_mode(adversary),
     writeln("No hay guardia en el modo de juego estándar.").

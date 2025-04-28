@@ -2,6 +2,7 @@
   "rooms": ["a", "b", "c", "d", "e"],
   "doors": [
       {"from": "a", "to": "b", "state": "unlocked"},
+      {"from": "a", "to": "c", "state": "unlocked"},
       {"from": "b", "to": "c", "state": "locked"},
       {"from": "c", "to": "d", "state": "locked"},
       {"from": "d", "to": "e", "state": "locked"}

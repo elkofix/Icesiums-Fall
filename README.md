@@ -12,6 +12,14 @@ This project solves an escape room-like maze using both logical and heuristic se
 
 ---
 
+
+### Controls
+
+M - Open the map
+
+H - Open the solver
+
+
 ## ⚙️ Methodology
 
 We followed an iterative methodology:
